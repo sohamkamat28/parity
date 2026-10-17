@@ -1,0 +1,507 @@
+[
+  {
+    "name": "runtime readiness",
+    "passed": true,
+    "seconds": 0.01,
+    "detail": {
+      "database": {
+        "status": "ready",
+        "engine": "sqlite"
+      },
+      "embedding": {
+        "status": "ready",
+        "mode": "minilm",
+        "error": null
+      },
+      "worker": {
+        "status": "ready",
+        "error": null
+      },
+      "browser": {
+        "status": "installed",
+        "executable": "<PARITY_ROOT>\\.cache\\ms-playwright\\chromium-1248\\chrome-win64\\chrome.exe",
+        "error": null
+      },
+      "chat": {
+        "status": "configured",
+        "model": "qwen2.5-1.5b-instruct-q4_k_m",
+        "provider": "local",
+        "error": null,
+        "tested_at": null
+      }
+    }
+  },
+  {
+    "name": "baseline with real MiniLM",
+    "passed": true,
+    "seconds": 0.54,
+    "detail": {
+      "created": 3,
+      "modified": 0,
+      "unchanged": 0,
+      "deleted": 0,
+      "restored": 0,
+      "missing": 0,
+      "failed": 0,
+      "new_vectors": 0,
+      "reused_vectors": 10,
+      "requests": 6,
+      "documents": 3,
+      "discovered": 6,
+      "budget_exhausted": false
+    }
+  },
+  {
+    "name": "free local cited chat v1",
+    "passed": true,
+    "seconds": 4.13,
+    "detail": {
+      "conversation_id": "c201e912dbbd452eb712928bc958bb06",
+      "message_id": "0839a09c28884b80bafce393f3093aba",
+      "answer": "Registration closes on 20 August 2026 at 5:00 PM. [1]",
+      "citations": [
+        {
+          "chunk_id": "d0ba793ea2e14d4eb0179239863101cc",
+          "page_id": "f5325e1f50c44a3c8e8ba672e20d179a",
+          "version_id": "a01f7a272ac6481199d154431e691af0",
+          "number": 1,
+          "url": "http://127.0.0.1:8080/demo/6d92793f7fb149ba9d47ce543b3dd807/en/circulars/honours-registration",
+          "title": "B.Tech Honours Degree Registration 2026\u201327",
+          "text": "Registration closes on 20 August 2026 at 5:00 PM.",
+          "locator": "Registration Deadline",
+          "last_verified_at": 1792079081.5283036,
+          "warnings": [],
+          "id": 1
+        }
+      ],
+      "warnings": [],
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "status": "answered",
+      "elapsed_ms": 4113
+    }
+  },
+  {
+    "name": "deadline and exact diff",
+    "passed": true,
+    "seconds": 0.85,
+    "detail": {
+      "page_id": "f5325e1f50c44a3c8e8ba672e20d179a",
+      "v1": 1,
+      "v2": 2,
+      "diff": "--- version 1\n+++ version 2\n@@ -4,10 +4,13 @@\n Students need a minimum CGPA of 7.50 through Semester IV with no active backlog.\n \n ## Registration Deadline\n-Registration closes on 20 August 2026 at 5:00 PM.\n+Registration closes on 28 August 2026 at 5:00 PM.\n \n ## Registration Fees\n Non-refundable demonstration fee: Rs. 2,500.\n \n ## Contact\n Contact the demonstration academic office for support.\n+\n+## Departmental Approval\n+A signed NOC from the Head of Department is mandatory before submission.",
+      "added_lines": 4,
+      "removed_lines": 1
+    }
+  },
+  {
+    "name": "follow-up cited chat v2",
+    "passed": true,
+    "seconds": 6.06,
+    "detail": {
+      "conversation_id": "c201e912dbbd452eb712928bc958bb06",
+      "message_id": "09f01af279c64ac9b660c1ff9e629531",
+      "answer": "Registration closes on 28 August 2026 at 5:00 PM. [1]\n\nA signed NOC from the Head of Department is mandatory before submission. [2]",
+      "citations": [
+        {
+          "chunk_id": "4b0f891971d643d9ab585f5e5b477d95",
+          "page_id": "f5325e1f50c44a3c8e8ba672e20d179a",
+          "version_id": "2ee896e9d57d41bdbd8a2079b5d4ae98",
+          "number": 2,
+          "url": "http://127.0.0.1:8080/demo/6d92793f7fb149ba9d47ce543b3dd807/en/circulars/honours-registration",
+          "title": "B.Tech Honours Degree Registration 2026\u201327",
+          "text": "Registration closes on 28 August 2026 at 5:00 PM.",
+          "locator": "Registration Deadline",
+          "last_verified_at": 1792079086.7221668,
+          "warnings": [],
+          "id": 1
+        },
+        {
+          "chunk_id": "9e8f3182b527461f979da136f4db2318",
+          "page_id": "f5325e1f50c44a3c8e8ba672e20d179a",
+          "version_id": "2ee896e9d57d41bdbd8a2079b5d4ae98",
+          "number": 2,
+          "url": "http://127.0.0.1:8080/demo/6d92793f7fb149ba9d47ce543b3dd807/en/circulars/honours-registration",
+          "title": "B.Tech Honours Degree Registration 2026\u201327",
+          "text": "A signed NOC from the Head of Department is mandatory before submission.",
+          "locator": "Departmental Approval",
+          "last_verified_at": 1792079086.7221668,
+          "warnings": [],
+          "id": 2
+        }
+      ],
+      "warnings": [],
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "status": "answered",
+      "elapsed_ms": 6048
+    }
+  },
+  {
+    "name": "historical evidence and chat",
+    "passed": true,
+    "seconds": 2.73,
+    "detail": {
+      "conversation_id": "6cc4d3183d4c4da29a82f1d88762590a",
+      "message_id": "e8944d1defb94969b5b9deb4b0f16e1c",
+      "answer": "Registration closes on 20 August 2026 at 5:00 PM. [1]",
+      "citations": [
+        {
+          "chunk_id": "d0ba793ea2e14d4eb0179239863101cc",
+          "page_id": "f5325e1f50c44a3c8e8ba672e20d179a",
+          "version_id": "a01f7a272ac6481199d154431e691af0",
+          "number": 1,
+          "url": "http://127.0.0.1:8080/demo/6d92793f7fb149ba9d47ce543b3dd807/en/circulars/honours-registration",
+          "title": "B.Tech Honours Degree Registration 2026\u201327",
+          "text": "Registration closes on 20 August 2026 at 5:00 PM.",
+          "locator": "Registration Deadline",
+          "last_verified_at": 1792079081.5283036,
+          "warnings": [
+            "Historical indexed snapshot"
+          ],
+          "id": 1
+        }
+      ],
+      "warnings": [
+        "Historical indexed snapshot"
+      ],
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "status": "answered",
+      "elapsed_ms": 2685
+    }
+  },
+  {
+    "name": "footer noise",
+    "passed": true,
+    "seconds": 0.43,
+    "detail": {
+      "created": 0,
+      "modified": 0,
+      "unchanged": 3,
+      "deleted": 0,
+      "restored": 0,
+      "missing": 0,
+      "failed": 0,
+      "new_vectors": 0,
+      "reused_vectors": 0,
+      "requests": 6,
+      "documents": 3,
+      "discovered": 6,
+      "budget_exhausted": false
+    }
+  },
+  {
+    "name": "PDF versioning",
+    "passed": true,
+    "seconds": 3.32,
+    "detail": {
+      "published": {
+        "created": 2,
+        "modified": 0,
+        "unchanged": 3,
+        "deleted": 0,
+        "restored": 0,
+        "missing": 0,
+        "failed": 0,
+        "new_vectors": 1,
+        "reused_vectors": 2,
+        "requests": 8,
+        "documents": 5,
+        "discovered": 8,
+        "budget_exhausted": false
+      },
+      "revised": {
+        "created": 0,
+        "modified": 1,
+        "unchanged": 4,
+        "deleted": 0,
+        "restored": 0,
+        "missing": 0,
+        "failed": 0,
+        "new_vectors": 0,
+        "reused_vectors": 1,
+        "requests": 8,
+        "documents": 5,
+        "discovered": 8,
+        "budget_exhausted": false
+      },
+      "diff": {
+        "page_id": "19da19311119447a814975d4d1cf0106",
+        "v1": 1,
+        "v2": 2,
+        "diff": "--- version 1\n+++ version 2\n@@ -3,6 +3,6 @@\n ## Supplementary Reassessment PDF\n SYNTHETIC DEMONSTRATION NOTICE\n Supplementary Reassessment\n-Application deadline: 4 October 2026.\n+Application deadline: 7 October 2026.\n Demonstration fee: Rs. 500.\n No real payment or application is accepted.",
+        "added_lines": 1,
+        "removed_lines": 1
+      }
+    }
+  },
+  {
+    "name": "JavaScript JSON-only update",
+    "passed": true,
+    "seconds": 11.85,
+    "detail": {
+      "baseline": {
+        "created": 2,
+        "modified": 0,
+        "unchanged": 0,
+        "deleted": 0,
+        "restored": 0,
+        "missing": 0,
+        "failed": 0,
+        "new_vectors": 0,
+        "reused_vectors": 3,
+        "requests": 2,
+        "documents": 2,
+        "discovered": 2,
+        "budget_exhausted": false
+      },
+      "changed": {
+        "created": 0,
+        "modified": 1,
+        "unchanged": 1,
+        "deleted": 0,
+        "restored": 0,
+        "missing": 0,
+        "failed": 0,
+        "new_vectors": 0,
+        "reused_vectors": 2,
+        "requests": 2,
+        "documents": 2,
+        "discovered": 2,
+        "budget_exhausted": false
+      },
+      "shell_unchanged": true
+    }
+  },
+  {
+    "name": "missing deletion restoration gap",
+    "passed": true,
+    "seconds": 8.43,
+    "detail": {
+      "first": {
+        "created": 0,
+        "modified": 0,
+        "unchanged": 4,
+        "deleted": 0,
+        "restored": 0,
+        "missing": 1,
+        "failed": 0,
+        "new_vectors": 0,
+        "reused_vectors": 0,
+        "requests": 8,
+        "documents": 5,
+        "discovered": 8,
+        "budget_exhausted": false
+      },
+      "second": {
+        "created": 0,
+        "modified": 0,
+        "unchanged": 4,
+        "deleted": 0,
+        "restored": 0,
+        "missing": 1,
+        "failed": 0,
+        "new_vectors": 0,
+        "reused_vectors": 0,
+        "requests": 8,
+        "documents": 5,
+        "discovered": 8,
+        "budget_exhausted": false
+      },
+      "confirmed": {
+        "created": 0,
+        "modified": 0,
+        "unchanged": 4,
+        "deleted": 1,
+        "restored": 0,
+        "missing": 0,
+        "failed": 0,
+        "new_vectors": 0,
+        "reused_vectors": 0,
+        "requests": 8,
+        "documents": 5,
+        "discovered": 8,
+        "budget_exhausted": false
+      },
+      "restored": {
+        "created": 0,
+        "modified": 0,
+        "unchanged": 4,
+        "deleted": 0,
+        "restored": 1,
+        "missing": 0,
+        "failed": 0,
+        "new_vectors": 0,
+        "reused_vectors": 3,
+        "requests": 8,
+        "documents": 5,
+        "discovered": 8,
+        "budget_exhausted": false
+      }
+    }
+  },
+  {
+    "name": "transient failure",
+    "passed": true,
+    "seconds": 2.12,
+    "detail": {
+      "metrics": {
+        "created": 0,
+        "modified": 0,
+        "unchanged": 4,
+        "deleted": 0,
+        "restored": 0,
+        "missing": 0,
+        "failed": 1,
+        "new_vectors": 0,
+        "reused_vectors": 0,
+        "requests": 10,
+        "documents": 5,
+        "discovered": 8,
+        "budget_exhausted": false
+      },
+      "verified_at_unchanged": true,
+      "version_retained": true
+    }
+  },
+  {
+    "name": "scheduled polling",
+    "passed": true,
+    "seconds": 15.11,
+    "detail": {
+      "detected_version": 3,
+      "seconds_limit": 45
+    }
+  },
+  {
+    "name": "five-tool MCP protocol",
+    "passed": true,
+    "seconds": 3.41,
+    "detail": {
+      "status": "passed",
+      "tools": [
+        {
+          "name": "search_docs",
+          "success": true,
+          "elapsed_ms": 159
+        },
+        {
+          "name": "get_page",
+          "success": true,
+          "elapsed_ms": 18
+        },
+        {
+          "name": "get_page_history",
+          "success": true,
+          "elapsed_ms": 21
+        },
+        {
+          "name": "diff_versions",
+          "success": true,
+          "elapsed_ms": 19
+        },
+        {
+          "name": "list_recent_changes",
+          "success": true,
+          "elapsed_ms": 24
+        }
+      ],
+      "elapsed_ms": 2874
+    }
+  },
+  {
+    "name": "public static and rendered websites",
+    "passed": true,
+    "seconds": 18.83,
+    "detail": [
+      {
+        "mode": "static",
+        "url": "https://quotes.toscrape.com/",
+        "run": {
+          "id": "4dae32364d30430cba5c29f746893031",
+          "source_id": "da4cc4c579f64ee684d4a49db0c5f9de",
+          "status": "succeeded",
+          "created_at": 1792078819.462095,
+          "started_at": 1792078820.0578828,
+          "finished_at": 1792078821.997355,
+          "generation": 1,
+          "metrics": {
+            "created": 1,
+            "modified": 0,
+            "unchanged": 0,
+            "deleted": 0,
+            "restored": 0,
+            "missing": 0,
+            "failed": 0,
+            "new_vectors": 0,
+            "reused_vectors": 1,
+            "requests": 1,
+            "documents": 1,
+            "discovered": 1,
+            "budget_exhausted": false
+          },
+          "error": null
+        },
+        "observations": {
+          "items": [
+            {
+              "id": "5a8afb8d00054a03a648dfdf503782a3",
+              "run_id": "4dae32364d30430cba5c29f746893031",
+              "url": "https://quotes.toscrape.com/",
+              "at": 1792078821.9938152,
+              "status": 200,
+              "outcome": "CREATED",
+              "detail": ""
+            }
+          ],
+          "total": 1,
+          "offset": 0,
+          "limit": 100
+        }
+      },
+      {
+        "mode": "browser",
+        "url": "https://quotes.toscrape.com/js/",
+        "run": {
+          "id": "2077e0fdae7c494a9499dd33f78acfb8",
+          "source_id": "33a560dc835d48e5aa1548aade2cfb51",
+          "status": "succeeded",
+          "created_at": 1792078822.3116477,
+          "started_at": 1792078823.0100057,
+          "finished_at": 1792078830.934369,
+          "generation": 1,
+          "metrics": {
+            "created": 1,
+            "modified": 0,
+            "unchanged": 0,
+            "deleted": 0,
+            "restored": 0,
+            "missing": 0,
+            "failed": 0,
+            "new_vectors": 0,
+            "reused_vectors": 1,
+            "requests": 1,
+            "documents": 1,
+            "discovered": 1,
+            "budget_exhausted": false
+          },
+          "error": null
+        },
+        "observations": {
+          "items": [
+            {
+              "id": "36065912c72345fb9f1a66ae20ee7157",
+              "run_id": "2077e0fdae7c494a9499dd33f78acfb8",
+              "url": "https://quotes.toscrape.com/js/",
+              "at": 1792078830.9309273,
+              "status": 200,
+              "outcome": "CREATED",
+              "detail": ""
+            }
+          ],
+          "total": 1,
+          "offset": 0,
+          "limit": 100
+        }
+      }
+    ]
+  }
+]

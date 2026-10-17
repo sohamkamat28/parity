@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+data/
+validation_data*/
+model_cache/
+*.log
+.env
+
+# Local credentials, downloaded runtimes and frontend dependencies.
+.env
+.cache/
+frontend/node_modules/

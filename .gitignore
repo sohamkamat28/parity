@@ -1,0 +1,26 @@
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Runtime data and downloaded dependencies
+.venv/
+venv/
+.cache/
+node_modules/
+data/
+validation_data*/
+model_cache/
+test-runtime/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.gguf
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+*.tsbuildinfo
+# Compiled frontend is intentionally tracked

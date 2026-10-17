@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: parity
+      POSTGRES_PASSWORD: ${PARITY_DB_PASSWORD:?Set PARITY_DB_PASSWORD}
+      POSTGRES_DB: parity
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - parity_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parity -d parity"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  parity_pg:

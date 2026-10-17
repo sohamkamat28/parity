@@ -1,0 +1,16 @@
+{
+  "copied_original_database": true,
+  "migration_version": 2,
+  "all_existing_rows_unchanged": true,
+  "table_counts": {
+    "sources": 0,
+    "embedding_cache": 0,
+    "runs": 0,
+    "pages": 0,
+    "versions": 0,
+    "events": 0,
+    "observations": 0,
+    "chunks": 0,
+    "intervals": 0
+  }
+}
