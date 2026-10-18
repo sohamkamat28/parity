@@ -8,11 +8,12 @@
     "Failed HTTP check retains previous verified value and warning; next successful check recovers",
     "Polling fallback delivers scheduled announcement updates",
     "390px layout, keyboard navigation, focus management and reduced-motion setting",
-    "Scheduled monitoring continues with browser tab closed; layout persists"
+    "Scheduled monitoring continues with browser tab closed; layout persists",
+    "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation"
   ],
   "screenshots": [
-    "outputs/runtime/browser-e1d503014fbd4f0ea0d7390887adac38/desktop.png",
-    "outputs/runtime/browser-e1d503014fbd4f0ea0d7390887adac38/narrow.png"
+    "outputs/runtime/browser-9b058433cd2c4136817a26d4313bbbc8/desktop.png",
+    "outputs/runtime/browser-9b058433cd2c4136817a26d4313bbbc8/narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

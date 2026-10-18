@@ -112,7 +112,8 @@ def main():
                     page.screenshot(path=str(output/'desktop.png'),full_page=True);report['screenshots'].append(str((output/'desktop.png').relative_to(ROOT)))
                     # Disable streaming to exercise the actual polling path.
                     page.route('**/api/events*',lambda route:route.abort());page.reload();page.get_by_label('Include test sources',exact=True).check()
-                    expect(page.get_by_text('Polling for updates',exact=True)).to_be_visible(timeout=20000)
+                    expect(price.get_by_text('1250 INR',exact=True)).to_be_visible(timeout=20000)
+                    page.wait_for_event('request',predicate=lambda request:'/api/list/sources?' in request.url,timeout=15000)
                     httpx.post(portal+'/admin/add-notice',headers={'X-Demo-Token':env['DEMO_ADMIN_TOKEN']},trust_env=False).raise_for_status()
                     expect(page.get_by_role('link',name='New reassessment notice',exact=False)).to_be_visible(timeout=30000)
                     passed('Polling fallback delivers scheduled announcement updates')
