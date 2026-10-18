@@ -50,23 +50,35 @@ def postgres_search(service,query,qvec,model,source_ids,limit,mode,as_of,include
     distance=projection.c.vector.cosine_distance(qvec)
     # Adding zero forces an exact sort over eligible rows; HNSW cannot trim this set.
     ids=stmt.with_only_columns(projection.c.chunk_id,maintain_column_froms=True)
-    dense=ids.order_by(distance if approximate else distance+0.0).limit(100).cte('dense')
-    lexq=func.plainto_tsquery(literal_column("'simple'::regconfig"),query)
+    if approximate:
+        pool=select(projection.c.chunk_id).where(projection.c.model_signature==model.signature).order_by(distance).limit(max(200,limit*20)).cte('ann_pool').prefix_with('MATERIALIZED')
+        eligible_ann=ids.where(projection.c.chunk_id.in_(select(pool.c.chunk_id))).order_by(distance).limit(100).cte('eligible_ann').prefix_with('MATERIALIZED')
+        # A history-heavy projection can exhaust the ANN pool. Recover with exact
+        # eligible retrieval rather than returning an empty or outdated answer.
+        fallback=ids.where(select(func.count()).select_from(eligible_ann).scalar_subquery()<limit).order_by(distance+0.0).limit(100).cte('dense_fallback')
+        dense=union(select(eligible_ann.c.chunk_id),select(fallback.c.chunk_id)).cte('dense')
+    else:dense=ids.order_by(distance+0.0).limit(100).cte('dense')
+    query_terms=' '.join(word for word in tokens(query) if word not in STOPWORDS) or query
+    lexq=func.plainto_tsquery(literal_column("'simple'::regconfig"),query_terms)
     lexdoc=func.to_tsvector(literal_column("'simple'::regconfig"),projection.c.text)
-    lexical=ids.where(lexdoc.op('@@')(lexq)).order_by(func.ts_rank_cd(lexdoc,lexq).desc()).limit(100).cte('lexical')
+    title_doc=func.to_tsvector(literal_column("'simple'::regconfig"),func.coalesce(versions.c.title,'')+' '+func.coalesce(projection.c.heading,''))
+    fts_score=func.ts_rank_cd(lexdoc,lexq)+func.ts_rank_cd(title_doc,lexq)
+    lexical=ids.where(or_(lexdoc.op('@@')(lexq),title_doc.op('@@')(lexq))).order_by(fts_score.desc(),projection.c.chunk_id).limit(100).cte('lexical')
     selected=union(select(dense.c.chunk_id),select(lexical.c.chunk_id))
     with service.db.engine.connect() as c:
         if approximate:
             c.exec_driver_sql("SET LOCAL hnsw.ef_search = 160")
             c.exec_driver_sql("SET LOCAL hnsw.iterative_scan = 'strict_order'")
-        rows=[dict(r) for r in c.execute(stmt.where(projection.c.chunk_id.in_(selected))).mappings()]
+        ranked_stmt=stmt.add_columns(projection.c.chunk_id.in_(select(dense.c.chunk_id)).label('_dense'),
+            projection.c.chunk_id.in_(select(lexical.c.chunk_id)).label('_lexical'),fts_score.label('_fts_score'))
+        rows=[dict(r) for r in c.execute(ranked_stmt.where(projection.c.chunk_id.in_(selected))).mappings()]
     qt=set(tokens(query))-STOPWORDS
     for row in rows:
         row['_sim']=cosine(qvec,row['vector'])
         row['_lex']=len(qt.intersection(tokens((row['title'] or '')+' '+row['text'])))
         row['_score']=0
-    dense_rows=sorted(rows,key=lambda r:(-r['_sim'],r['chunk_id']))
-    lexical_rows=sorted([r for r in rows if r['_lex']],key=lambda r:(-r['_lex'],r['chunk_id']))
+    dense_rows=sorted([r for r in rows if r['_dense']],key=lambda r:(-r['_sim'],r['chunk_id']))
+    lexical_rows=sorted([r for r in rows if r['_lexical']],key=lambda r:(-r['_fts_score'],r['chunk_id']))
     for ranked in (dense_rows if model.mode=='minilm' else [],lexical_rows):
         for rank,row in enumerate(ranked,1):row['_score']+=1/(60+rank)
     results=[]

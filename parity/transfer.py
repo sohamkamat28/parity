@@ -13,7 +13,9 @@ import struct
 import tempfile
 import time
 import zipfile
+from contextlib import closing
 from sqlalchemy import create_engine,select,func,inspect,text
+from sqlalchemy.pool import NullPool
 from .db import DB,meta,SCHEMA_VERSION
 
 FORMAT=1
@@ -31,8 +33,9 @@ def resolve_sqlite(source):
 
 def _sqlite_snapshot(source,destination):
     # SQLite backup includes the WAL without changing the original database.
-    with sqlite3.connect(source.as_uri()+'?mode=ro',uri=True,timeout=30) as original:
-        with sqlite3.connect(destination) as copied:original.backup(copied)
+    with closing(sqlite3.connect(source.as_uri()+'?mode=ro',uri=True,timeout=30)) as original:
+        with closing(sqlite3.connect(destination)) as copied:
+            with copied:original.backup(copied)
 
 
 def _plain(value):
@@ -85,7 +88,7 @@ def backup_database(database_url,data_dir,destination):
     data=Path(data_dir).resolve();destination=Path(destination).resolve()
     if destination.exists():raise ValueError('Backup destination already exists; choose a new filename')
     destination.parent.mkdir(parents=True,exist_ok=True)
-    engine=create_engine(database_url)
+    engine=create_engine(database_url,poolclass=NullPool)
     archive_temp=None
     try:
         with tempfile.TemporaryDirectory(prefix='parity-backup-',dir=destination.parent) as temporary:
@@ -94,7 +97,7 @@ def backup_database(database_url,data_dir,destination):
                 source=Path(engine.url.database).resolve()
                 engine.dispose();snapshot=temporary/'snapshot.sqlite'
                 _sqlite_snapshot(source,snapshot)
-                engine=create_engine('sqlite:///'+str(snapshot))
+                engine=create_engine('sqlite:///'+str(snapshot),poolclass=NullPool)
             manifest={'format':FORMAT,'created_at':time.time(),'schema_version':None,
                 'database':engine.dialect.name,'vector_representation':'float32','tables':{},'files':{}}
             archive_temp=temporary/'backup.zip';references=set()

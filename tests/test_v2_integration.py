@@ -219,3 +219,95 @@ def test_all_five_actual_mcp_contracts(system,monkeypatch):
                     assert not response.isError,(name,response)
                     assert response.content
     asyncio.run(verify())
+
+
+def test_real_capture_process_termination_and_recovery(system,tmp_path):
+    import subprocess
+    service,m=system;activated=activate(m,('Current Price',))
+    html_path=tmp_path/'fixture.html';html_path.write_text(HTML)
+    code='''
+import os
+from pathlib import Path
+from parity.db import DB
+from parity.service import Service
+from parity.jobs import Jobs
+from parity.fetch import Response
+class Fetcher:
+    demo_origin='http://127.0.0.1:8080'
+    def get(self,url,source,headers=None):return Response(url,200,{'content-type':'text/html'},Path(os.environ['FIXTURE_PATH']).read_bytes())
+service=Service(DB(),fetcher=Fetcher(),inline_index=False)
+jobs=Jobs(service)
+original=jobs._store_response
+def terminate(claim,response):
+    original(claim,response)
+    os._exit(99)
+jobs._store_response=terminate
+jobs.capture_once(os.environ['RUN_ID'])
+'''
+    env={**os.environ,'DATABASE_URL':service.db.engine.url.render_as_string(hide_password=False),'PARITY_DATA_DIR':str(config.DATA),'RUN_ID':activated['run']['id'],'FIXTURE_PATH':str(html_path)}
+    stopped=subprocess.run([sys.executable,'-c',code],env=env,timeout=20,capture_output=True)
+    assert stopped.returncode==99,stopped.stderr.decode()[-500:]
+    from test_jobs import expire_claim
+    expire_claim(service);service.fetcher.body=HTML.replace('Rs. 1,200.50','Rs. 999')
+    assert Jobs(service).capture_once(activated['run']['id'])['status']=='succeeded'
+    assert Jobs(service).capture_once(activated['run']['id']) is None
+    assert len(service.db.all(select(versions)))==1
+    assert len(service.db.all(select(monitor_observations)))==2
+    assert m.dashboard()['widgets'][0]['value']=='1200.5'
+    from parity.db import observations
+    assert len(service.db.all(select(observations)))==1
+
+
+def test_v1_vector_history_migrates_without_changing_original(system,tmp_path):
+    target,_=system
+    if target.db.engine.dialect.name!='postgresql':pytest.skip('Legacy PostgreSQL migration requires PARITY_TEST_DATABASE_URL')
+    from sqlalchemy import create_engine
+    from parity.db import _V2_TABLES,_V3_TABLES,schema,sources,cache,chunks,intervals
+    data=tmp_path/'legacy';(data/'artifacts').mkdir(parents=True)
+    body=b'<html><h1>Legacy capacity</h1><p>Capacity is 10 MW.</p></html>'
+    raw=hashlib.sha256(body).hexdigest();(data/'artifacts'/raw).write_bytes(body)
+    path=data/'parity.db';engine=create_engine('sqlite:///'+str(path));model=Embedder('lexical')
+    excluded={t.name for t in (*_V2_TABLES,*_V3_TABLES)}
+    meta.create_all(engine,tables=[t for t in meta.sorted_tables if t.name not in excluded])
+    with engine.begin() as c:
+        c.execute(schema.insert().values(number=1))
+        c.execute(sources.insert().values(id='legacy-source',name='Legacy',root_url='https://legacy.example/',config={'interval':900},enabled=True))
+        c.execute(pages.insert().values(id='legacy-page',source_id='legacy-source',url='https://legacy.example/',title='Legacy capacity',current_id='legacy-v1',last_version_id='legacy-v1',availability='active',health='healthy',verified_at=10))
+        c.execute(versions.insert().values(id='legacy-v1',page_id='legacy-page',number=1,title='Legacy capacity',content='Capacity is 10 MW.',hash=raw,raw_hash=raw,raw_key=raw,observed_at=5,indexed_at=10))
+        c.execute(cache.insert().values(id='legacy-vector',key='legacy-key',signature=model.signature,input='Capacity is 10 MW.',vector=model.encode('Capacity is 10 MW.')))
+        c.execute(chunks.insert().values(id='legacy-chunk',version_id='legacy-v1',ordinal=0,heading='Capacity',locator='Capacity',text='Capacity is 10 MW.',cache_id='legacy-vector'))
+        c.execute(intervals.insert().values(id='legacy-interval',page_id='legacy-page',version_id='legacy-v1',start=10))
+    engine.dispose();before=hashlib.sha256(path.read_bytes()).hexdigest()
+    migrated=tmp_path/'legacy-migrated'
+    result=migrate_sqlite(data,target.db.engine.url.render_as_string(hide_password=False),migrated,tmp_path/'legacy-backup.zip')
+    assert result['restore']['verified'] and hashlib.sha256(path.read_bytes()).hexdigest()==before
+    from parity.search_schema import projection
+    assert target.db.one(select(projection))['chunk_id']=='legacy-chunk'
+    target.embedder=model
+    found=target.search('capacity')['results']
+    assert found and found[0]['version_id']=='legacy-v1' and found[0]['chunk_id']=='legacy-chunk'
+    assert (migrated/'artifacts'/raw).read_bytes()==body
+
+
+def test_postgres_lexical_rank_does_not_reward_generic_dense_candidates(system):
+    service,_=system
+    if service.db.engine.dialect.name!='postgresql':pytest.skip('PostgreSQL-specific hybrid rank fusion')
+    from parity.db import sources,cache,chunks
+    from parity.search_schema import projection
+    class Model:
+        mode='minilm';signature='deterministic-ranking-fixture'
+        def encode(self,query):return [1.0]+[0.0]*383
+    service.embedder=Model();now=time.time()
+    with service.db.tx() as c:
+        c.execute(sources.insert().values(id='rank-source',name='Ranking fixture',root_url='https://rank.example/',config={'interval':900},enabled=True))
+        for i in range(201):
+            target=i==200;pid=f'rank-page-{i}';vid=f'rank-version-{i}';cid=f'rank-chunk-{i}'
+            content='Project '+('Aster88888' if target else f'Other{i}')+' verified capacity 10 MW.'
+            vector=([0.0,1.0]+[0.0]*382) if target else service.embedder.encode('')
+            c.execute(pages.insert().values(id=pid,source_id='rank-source',url='https://rank.example/'+str(i),title='Project',availability='active',health='healthy',current_id=vid,last_version_id=vid,verified_at=now))
+            c.execute(versions.insert().values(id=vid,page_id=pid,number=1,title='Project',content=content,observed_at=now,indexed_at=now))
+            c.execute(cache.insert().values(id=cid,key=cid,signature=service.embedder.signature,input=content,vector=vector))
+            c.execute(chunks.insert().values(id=cid,version_id=vid,ordinal=0,heading='Capacity',locator='Capacity',text=content,cache_id=cid))
+            c.execute(projection.insert().values(chunk_id=cid,source_id='rank-source',page_id=pid,version_id=vid,text=content,heading='Capacity',locator='Capacity',model_signature=service.embedder.signature,vector=vector))
+    found=service.search('Project Aster88888 verified capacity MW',limit=10)
+    assert any(r['page_id']=='rank-page-200' for r in found['results'])

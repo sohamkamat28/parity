@@ -66,19 +66,21 @@ def test_lifecycle(system):
     assert "28 August" in s.get_page(honours["id"])["version"]["content"]
     diff=s.diff(honours["id"],1,2)["diff"]
     assert "+Registration closes on 28 August" in diff and "NOC" in diff
-    now=s.search("honours registration deadline")
+    now=s.search("honours registration deadline",source_ids=[src["id"]])
+    assert any(r["page_id"]==honours["id"] for r in now["results"])
     assert all(r["number"]==2 for r in now["results"] if r["page_id"]==honours["id"])
-    past=s.search("honours registration deadline",mode="as_of",as_of=t1)
+    past=s.search("honours registration deadline",source_ids=[src["id"]],mode="as_of",as_of=t1)
+    assert any(r["page_id"]==honours["id"] for r in past["results"])
     assert all(r["number"]==1 for r in past["results"] if r["page_id"]==honours["id"])
     act("delete-scholarship")
     first=crawl();assert first["metrics"]["missing"]==1
     gap=time.time()
-    assert not any(r["page_id"]==scholarship["id"] for r in s.search("scholarship renewal")["results"])
+    assert not any(r["page_id"]==scholarship["id"] for r in s.search("scholarship renewal",source_ids=[src["id"]])["results"])
     crawl();last=crawl();assert last["metrics"]["deleted"]==1
     assert s.get_page(scholarship["id"])["page"]["availability"]=="deleted"
     act("restore-scholarship");restored=crawl();assert restored["metrics"]["restored"]==1
     assert s.get_page(scholarship["id"])["version"]["number"]==2
-    historical=s.search("scholarship renewal",mode="as_of",as_of=gap)
+    historical=s.search("scholarship renewal",source_ids=[src["id"]],mode="as_of",as_of=gap)
     assert not any(r["page_id"]==scholarship["id"] for r in historical["results"])
     act("add-notice");added=crawl();assert added["metrics"]["created"]==2,added
     pdf=next(p for p in s.overview()["pages"] if p["url"].endswith(".pdf"))
@@ -117,7 +119,7 @@ def test_duplicate_jobs_and_disabled_source(system):
     s.run(a["id"]);s.run(a["id"])
     assert len(s.db.all(select(versions)))==3
     s.set_source(src["id"],enabled=False)
-    assert s.search("honours")["results"]==[]
+    assert s.search("honours",source_ids=[src["id"]])["results"]==[]
     with pytest.raises(ValueError):s.enqueue(src["id"])
 
 def test_missing_recovery_and_reversion(system):
@@ -171,8 +173,8 @@ def test_extraction_preserves_meaning():
 
 def test_no_answer_and_invalid_history(system):
     s,src,crawl,act,client=system;crawl()
-    assert s.search("zzqnonexistentwords")["results"]==[]
-    assert s.search("honours",mode="as_of",as_of=1)["results"]==[]
+    assert s.search("zzqnonexistentwords",source_ids=[src["id"]])["results"]==[]
+    assert s.search("honours",source_ids=[src["id"]],mode="as_of",as_of=1)["results"]==[]
     with pytest.raises(ValueError):s.search("honours",mode="as_of")
     with pytest.raises(ValueError):s.get_page("unknown",1)
 

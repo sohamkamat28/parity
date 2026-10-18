@@ -15,6 +15,7 @@ jobs:
       PARITY_PROFILE: sqlite
       PARITY_DATA_DIR: test-runtime
       PARITY_OFFLINE: '1'
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
