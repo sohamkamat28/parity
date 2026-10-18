@@ -1,5 +1,6 @@
 """Download a pinned, CPU-only local model runtime. No account or API key needed."""
 import hashlib, sys, urllib.request, zipfile, zlib, tarfile, platform
+import os, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -31,6 +32,19 @@ def download(url,path,expected):
     if digest(temporary)!=expected:raise RuntimeError('Download checksum mismatch: '+path.name)
     temporary.replace(path)
 
+def install_mac_runtime(archive, runtime):
+    # Never truncate a mapped Mach-O file: macOS caches signatures by inode.
+    # Re-running setup must also leave an already running server intact.
+    with tempfile.TemporaryDirectory(prefix='runtime-install-', dir=runtime.parent) as folder:
+        staging=Path(folder)
+        with tarfile.open(archive) as packaged:packaged.extractall(staging,filter='data')
+        for source in staging.rglob('*'):
+            destination=runtime/source.relative_to(staging)
+            if source.is_symlink() or source.is_file():
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                os.replace(source,destination)
+            elif source.is_dir():destination.mkdir(parents=True,exist_ok=True)
+
 def main():
     mac = sys.platform=='darwin' and platform.machine()=='arm64'
     if sys.platform!='win32' and not mac:raise SystemExit('Use a native llama-server on PATH or PARITY_LLAMA_SERVER, and place the verified GGUF in PARITY_CACHE_DIR/local-chat. Bundled runtime downloads support Windows x64 and macOS arm64.')
@@ -41,7 +55,7 @@ def main():
     download(url,archive,sha)
     runtime=CACHE/'runtime';runtime.mkdir(exist_ok=True)
     if mac:
-        with tarfile.open(archive) as packaged:packaged.extractall(runtime,filter='data')
+        install_mac_runtime(archive,runtime)
     else:
         with zipfile.ZipFile(archive) as zipped:
             for info in zipped.infolist():
@@ -50,6 +64,11 @@ def main():
                 if destination.is_file() and destination.stat().st_size==info.file_size:
                     if zlib.crc32(destination.read_bytes())==info.CRC:continue
                 zipped.extract(info,runtime)
+    executable=next(runtime.rglob('llama-server' if mac else 'llama-server.exe'))
+    probe=subprocess.run([str(executable),'--version'],capture_output=True,timeout=30)
+    if probe.returncode:
+        raise RuntimeError(f'Local answer runtime failed its startup check (exit {probe.returncode}). '
+                           'Re-run setup before starting Parity; monitoring can run without models.')
     download(MODEL_URL,CACHE/'qwen2.5-1.5b-instruct-q4_k_m.gguf',MODEL_SHA)
     print('Free local chat is installed and checksums are verified.',flush=True)
 

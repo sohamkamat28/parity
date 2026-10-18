@@ -105,3 +105,41 @@ def test_launcher_reports_failed_subprocess_and_cleans_owned_children(tmp_path):
         sleeper=owned.start('sleep',[sys.executable,'-c','import time; time.sleep(60)'],tmp_path,os.environ.copy())
     finally:owned.close()
     assert sleeper.poll() is not None
+
+@pytest.mark.parametrize('failure,expected',[
+    ('connect','service is stopped'),('timeout','took too long'),
+    ('loading','loading or busy'),('auth','credentials'),('invalid','valid response')])
+def test_local_failures_report_safe_specific_recovery(tmp_path,monkeypatch,failure,expected):
+    import httpx
+    monkeypatch.setattr(config,'CHAT_PROVIDER','local')
+    request=httpx.Request('POST','http://127.0.0.1/chat')
+    def post(self,*args,**kwargs):
+        if failure=='connect':raise httpx.ConnectError('secret',request=request)
+        if failure=='timeout':raise httpx.ReadTimeout('secret',request=request)
+        code={'loading':503,'auth':401,'invalid':200}[failure]
+        return httpx.Response(code,json={'secret':'private provider body'},request=request)
+    monkeypatch.setattr(httpx.Client,'post',post)
+    chat=ChatService(EvidenceService(tmp_path))
+    with pytest.raises(ChatError,match=expected) as caught:
+        chat._local_call(input=[],text_format=SearchQuestion)
+    assert 'secret' not in str(caught.value) and 'setup.bat' not in str(caught.value)
+    assert 'Evidence search remains available' in str(caught.value)
+
+
+@pytest.mark.skipif(sys.platform=='win32',reason='macOS/POSIX runtime replacement; Windows uses the ZIP installer')
+def test_mac_runtime_reinstall_preserves_existing_mapped_file(tmp_path):
+    import io,tarfile
+    from scripts.setup_local_chat import install_mac_runtime
+    runtime=tmp_path/'runtime';runtime.mkdir()
+    executable=runtime/'llama-server';executable.write_bytes(b'old executable')
+    archive=tmp_path/'runtime.tar.gz'
+    with tarfile.open(archive,'w:gz') as packaged:
+        info=tarfile.TarInfo('llama-server');info.size=len(b'new executable');info.mode=0o755
+        packaged.addfile(info,io.BytesIO(b'new executable'))
+    with executable.open('rb') as mapped:
+        old_inode=executable.stat().st_ino
+        install_mac_runtime(archive,runtime)
+        assert mapped.read()==b'old executable'
+        assert executable.read_bytes()==b'new executable'
+        assert executable.stat().st_ino!=old_inode
+        assert executable.stat().st_mode & 0o111

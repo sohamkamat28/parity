@@ -103,7 +103,17 @@ class ChatService:
             return result
         except Exception as error:
             self._tested=None
-            self._error='The local answer model is unavailable or could not finish. Run setup.bat, then start.bat. Evidence search remains available.'
+            if isinstance(error,httpx.ConnectError):
+                message='The local answer service is stopped. Restart Parity with models enabled and check local-chat.log in the data directory if it stops again.'
+            elif isinstance(error,httpx.TimeoutException):
+                message='The local answer model took too long. Try a shorter question or retry when the device is less busy.'
+            elif isinstance(error,httpx.HTTPStatusError) and error.response.status_code==503:
+                message='The local answer model is loading or busy. Wait a moment and retry.'
+            elif isinstance(error,httpx.HTTPStatusError) and error.response.status_code in (401,403):
+                message='The local answer service rejected its connection credentials. Restart Parity to reconnect its services.'
+            else:
+                message='The local answer model could not finish a valid response. Retry the question and check local-chat.log in the data directory if it repeats.'
+            self._error=message+' Evidence search remains available.'
             raise ChatError(self._error,503) from error
 
     def test_connection(self):

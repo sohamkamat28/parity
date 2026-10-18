@@ -47,6 +47,8 @@ python3.14 -m venv .venv
 
 Linux static/browser development uses the same Python entry points, but requires Playwright system dependencies (`python -m playwright install --with-deps chromium`). Bundled local-chat downloads support Windows x64 and macOS arm64. Other systems must provide a native `llama-server` via PATH or `PARITY_LLAMA_SERVER`, plus the verified Qwen GGUF in the cache. That native Linux chat setup is untested here.
 
+If chat reports that its service is stopped, inspect `local-chat.log` in the configured data directory. On macOS, an empty log together with a DiagnosticReports entry containing `CODESIGNING` / `Taskgated Invalid Signature` can follow an older setup overwriting an executable in place. Run `.venv/bin/python scripts/setup_local_chat.py`, then restart `.venv/bin/python run.py`. Setup now installs runtime files by atomic replacement and verifies the executable starts. No Gatekeeper setting changes are needed. Monitoring and evidence search remain available while chat is stopped.
+
 ## Configuration and readiness
 
 Copy `.env.example` only when `.env` does not already exist. Relevant settings:
