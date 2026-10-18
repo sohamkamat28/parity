@@ -73,6 +73,8 @@ def test_api_history_comparisons_totals_and_scope(system):
         small=client.get('/api/dashboard?limit=1').json()
         assert len(small['monitors'])==1 and small['next_cursor']
         assert small['totals']['monitors']==2 and small['totals']['fields']==4
+        partial=client.get('/api/dashboard/widgets',params={'monitor_ids':activated['monitor']['id']}).json()
+        assert len(partial['monitors'])==1 and partial['totals']['monitors']==2 and partial['totals']['fields']==4
         with service.db.tx() as c:c.execute(monitor_field_states.update().values(last_verified_at=time.time()-10000))
         stale=client.get('/api/dashboard?limit=1').json()
         assert stale['totals']['attention']==4 and stale['attention']

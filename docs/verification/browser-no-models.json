@@ -11,8 +11,8 @@
     "Scheduled monitoring continues with browser tab closed; layout persists"
   ],
   "screenshots": [
-    "outputs/runtime/browser-1cbfc82f874c4968bfbd65f6d1594d7c/desktop.png",
-    "outputs/runtime/browser-1cbfc82f874c4968bfbd65f6d1594d7c/narrow.png"
+    "outputs/runtime/browser-f76f9f1a7e914108a27f5c698af27995/desktop.png",
+    "outputs/runtime/browser-f76f9f1a7e914108a27f5c698af27995/narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

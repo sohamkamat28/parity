@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {ArrowDown,ArrowUp,Check,ChevronRight,Eye,EyeOff,History,Pause,Pin,Play,Plus,RefreshCw,Settings2,ShieldCheck,TriangleAlert} from 'lucide-react';
 import type {Shared} from './App';
 import type {Capture,DashboardData,DashboardLayout,Monitor,MonitorField,Observation,PageResult,Source} from './types';
@@ -26,6 +26,24 @@ const EMPTY_DASHBOARD:DashboardData={sources:[],monitors:[],widgets:[],totals:{}
 export function Dashboard(shared:Shared){
  const {revision,notify,refresh,navigate,openCapture}=shared;
  const [result,setResult]=useState<DashboardData>(EMPTY_DASHBOARD),[layout,setLayout]=useState<DashboardLayout>({order:[],hidden:[],pinned:[]}),[source,setSource]=useState(sessionStorage.getItem('parity-dashboard-source')??''),[includeDemo,setIncludeDemo]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busy,setBusy]=useState(''),[wizard,setWizard]=useState<{source?:Source;monitor?:Monitor}|null>(null),[history,setHistory]=useState<MonitorField|null>(null),[manage,setManage]=useState(false),[cursor,setCursor]=useState(''),[previous,setPrevious]=useState<string[]>([]);
+ const current=useRef(result),generations=useRef(new Map<string,number>()),sequence=useRef(0);current.current=result;
+ useEffect(()=>{
+  let cancelled=false;
+  const update=(event:Event)=>{
+   const row=(event as CustomEvent).detail;
+   if(source&&row.source_id&&row.source_id!==source)return;
+   const ids=current.current.monitors.filter(m=>row.monitor_id?m.id===row.monitor_id:m.source_id===row.source_id).map(m=>m.id);
+   if(!ids.length)return;
+   const serial=++sequence.current;ids.forEach(id=>generations.current.set(id,serial));
+   const params=new URLSearchParams({include_demo:String(includeDemo)});if(source)params.set('source_id',source);ids.forEach(id=>params.append('monitor_ids',id));
+   api<DashboardData>(`/api/dashboard/widgets?${params}`).then(next=>{
+    if(cancelled)return;
+    const applicable=new Set(ids.filter(id=>generations.current.get(id)===serial));
+    setError('');setResult(old=>{const monitors=old.monitors.map(m=>applicable.has(m.id)?next.monitors.find(n=>n.id===m.id)??m:m);return {...old,monitors,widgets:monitors.flatMap(m=>m.fields),attention:[...old.attention.filter(a=>!applicable.has(a.monitor_id)),...next.attention.filter(a=>applicable.has(a.monitor_id))],totals:serial===sequence.current?next.totals:old.totals};});
+   }).catch(e=>{if(!cancelled)setError(e.message);});
+  };
+  window.addEventListener('parity-monitor-update',update);return()=>{cancelled=true;window.removeEventListener('parity-monitor-update',update);};
+ },[source,includeDemo]);
  useEffect(()=>{api<DashboardLayout>('/api/dashboard/layout').then(l=>setLayout({order:l.order??[],hidden:l.hidden??[],pinned:l.pinned??[]})).catch(e=>setError(e.message));},[]);
  useEffect(()=>{sessionStorage.setItem('parity-dashboard-source',source);let stale=false;const params=new URLSearchParams({include_demo:String(includeDemo)});if(source)params.set('source_id',source);if(cursor)params.set('cursor',cursor);api<DashboardData>(`/api/dashboard?${params}`).then(r=>{if(!stale){setResult({...EMPTY_DASHBOARD,...r});setError('');}}).catch(e=>{if(!stale)setError(e.message);}).finally(()=>{if(!stale)setLoading(false);});return()=>{stale=true;};},[source,includeDemo,revision,cursor]);
  const widgets=(result.widgets?.length?result.widgets:result.monitors.flatMap(m=>m.fields.map(f=>({...f,monitor_id:m.id,source_id:m.source_id,source_name:m.source_name})))).filter(f=>f.enabled!==false);

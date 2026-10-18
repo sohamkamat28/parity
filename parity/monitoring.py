@@ -372,7 +372,7 @@ class MonitorService:
             connection.execute(schema.monitor_events.insert().values(source_id=source['id'], monitor_id=monitor_id, kind='monitor_updated', at=at, detail={'revision_id': revision_id, **counts}))
         return counts
 
-    def dashboard(self, source_id=None, include_demo=False, limit=50, cursor=None):
+    def dashboard(self, source_id=None, include_demo=False, limit=50, cursor=None, monitor_ids=None):
         from .db import sources
         limit = min(100, max(1, int(limit)))
         query = select(schema.monitors, sources.c.name.label('source_name'), sources.c.config.label('source_config'), sources.c.next_due, sources.c.paused.label('source_paused'), sources.c.enabled.label('source_enabled'), sources.c.root_url.label('source_root_url'), sources.c.created_at.label('source_created_at')).join(sources, sources.c.id == schema.monitors.c.source_id)
@@ -390,6 +390,8 @@ class MonitorService:
         overdue = time.time() - sources.c.config['interval'].as_float()
         needs_attention = or_(schema.monitor_field_states.c.status.not_in(['ok', 'pending']), schema.monitor_field_states.c.last_verified_at < overdue)
         attention_total = self.db.one(select(func.count().label('n')).select_from(schema.monitor_field_states.join(schema.monitors, schema.monitor_field_states.c.revision_id == schema.monitors.c.revision_id).join(sources, schema.monitors.c.source_id == sources.c.id)).where(schema.monitors.c.revision_id.in_(select(eligible.c.revision_id)), needs_attention))['n']
+        if monitor_ids is not None:
+            query=query.where(schema.monitors.c.id.in_(monitor_ids))
         if cursor:
             query = query.where(schema.monitors.c.id > cursor)
         rows = self.db.all(query.order_by(schema.monitors.c.id).limit(limit+1))

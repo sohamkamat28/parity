@@ -13,6 +13,8 @@ from run import OwnedProcesses
 with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
 logs=ROOT/'outputs/runtime/benchmark';logs.mkdir(parents=True,exist_ok=True)
 env={**os.environ,'PARITY_EMBEDDING_URL':f'http://127.0.0.1:{port}','PARITY_EMBEDDING_TOKEN':secrets.token_urlsafe(32),'PARITY_OFFLINE':'1','OMP_NUM_THREADS':'4','TOKENIZERS_PARALLELISM':'false'}
+options=__import__('argparse').ArgumentParser(add_help=False);options.add_argument('--output',default='docs/verification/benchmark.json');output_args,_=options.parse_known_args()
+report_path=ROOT/output_args.output;report_path.unlink(missing_ok=True)
 started=time.perf_counter();owned=OwnedProcesses(logs)
 try:
     owned.start('embedding',[sys.executable,'-m','uvicorn','parity.embedding_server:app','--host','127.0.0.1','--port',str(port),'--no-access-log'],ROOT,env)
@@ -30,9 +32,8 @@ try:
     raise SystemExit(result.returncode)
 finally:
     owned.close()
-    report_path=ROOT/'docs/verification/benchmark.json'
     if report_path.exists():
-        report=json.loads(report_path.read_text());report['shared_model_startup_seconds']=locals().get('startup_seconds')
+        report=json.loads(report_path.read_text());report['status']='passed' if locals().get('result') and result.returncode==0 else 'failed';report['shared_model_startup_seconds']=locals().get('startup_seconds')
         try:
             import resource
             report['largest_child_peak_rss_bytes']=resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss*(1 if sys.platform=='darwin' else 1024)

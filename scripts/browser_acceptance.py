@@ -35,6 +35,7 @@ def eventually(check,seconds=40):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--with-models',action='store_true');args=p.parse_args()
+    target=ROOT/'docs/verification'/('browser-models.json' if args.with_models else 'browser-no-models.json');target.unlink(missing_ok=True)
     app_port,portal_port,chat_port,embed_port=port(),port(),port(),port()
     base=f'http://127.0.0.1:{app_port}';portal=f'http://127.0.0.1:{portal_port}'
     output=ROOT/'outputs/runtime'/('browser-'+uuid.uuid4().hex);output.mkdir(parents=True)

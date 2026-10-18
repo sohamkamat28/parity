@@ -1,33 +1,37 @@
-# Parity 2.0 — current implementation snapshot
+# Parity 2.0 implementation status
 
-Snapshot date: 17 October 2026.
+Updated 18 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
 
-## Implemented source present
+## Implemented and exercised
 
-- Version 3 schema registration for monitors, captures, observations, jobs and retrieval projection.
-- Typed structured extraction, preview, monitor activation and observation history.
-- Durable URL jobs, renewable ownership, retries and independent indexing.
-- Shared authenticated loopback embedding service and PostgreSQL retrieval projection.
-- Dashboard, source setup, history, retained chat and Settings frontend.
-- Docker configuration, launcher changes and migration/backup tool source.
+- Reviewed source setup, deterministic/manual extraction and local-model assistance, typed values, explicit periods, baseline activation and immutable rule revisions.
+- Independent capture and indexing pipelines, durable discovery/retries/leases, ownership fencing, real process interruption/recovery, idempotent publication and shared Chromium limits including previews.
+- Dashboard values/tables/lists, changed cells, comparable previous values, observed history charts, failed/stale/repair attention, persistent layout and immutable evidence.
+- Paginated operational/history APIs and accurate global aggregates. Committed SSE supports reconnect IDs, reset after gaps, affected-widget refresh and polling fallback while retaining view state.
+- PostgreSQL hybrid retrieval, eligible exact filters, opt-in HNSW with eligible fallback, rebuildable projections and exclusion of old current versions while indexing is pending.
+- Free native Qwen chat, one shared authenticated MiniLM process, retained conversations, immutable monitor/document citations and server-side comparable calculations.
+- Existing REST/CLI commands and all five actual MCP protocol contracts, both direct and authenticated API bridge.
+- Verified populated backup/restore and explicit v1/v3 SQLite-to-PostgreSQL migrations; original SQLite hashes and referenced artifacts retained.
+- Prebuilt frontend, Windows setup/launcher scripts, Docker prerequisites, configurable repository-relative data/cache paths and reproducible CI/testing/packaging commands.
 
-Presence of implementation is not a claim that every acceptance requirement has passed.
+## Verification
 
-## Checks performed for this snapshot
+The local combined suite passed **107 tests**, with **3 intentional SQLite skips for PostgreSQL-only cases** that passed on PostgreSQL. Production frontend build, dependency compatibility and compile checks pass. Browser rehearsals passed with models stopped and enabled, including automatic updates, polling fallback, failed-check recovery, narrow/keyboard navigation and monitoring after tab closure. Public scalar/list/table extraction passed on accessible pages.
 
-- React/TypeScript production build: passed; compiled assets included.
-- Python compile check: passed for the files present when checked.
-- Existing lifecycle/release/chat suite: 33 passed, 10 skipped, 2 failed.
-- Worker implementation tests: 7 passed in the worker development run.
+Windows and Ubuntu backend, PostgreSQL integration and frontend checks passed on [the corrected CI run](https://github.com/sohamkamat28/parity/actions/runs/39095600869). Subsequent branch runs add the full PostgreSQL browser rehearsal and final integration checks; see [current CI runs](https://github.com/sohamkamat28/parity/actions).
 
-The two existing-suite failures concern an old test expecting implicit inclusion of demo sources and an old schema-version assertion expecting version 2 rather than 3. They are recorded rather than concealed; the regression suite still needs reconciliation with the new contracts and a complete rerun.
+Real MiniLM benchmark corpora at 1,000, 10,000 and 50,000 chunks include distinct vector counts, embedding reuse, quality against known targets and exact retrieval, query plans, one/five clients, latency and scoped memory/ingestion measurements. Final known-target hit@10 was 1.0 on this synthetic workload. HNSW remains opt-in. Earlier faster ranker measurements were superseded after fixing a quality bug.
 
-## Still pending
+Read [the complete verification report](VERIFICATION_REPORT.md), [operating guide](OPERATING_GUIDE.md) and [presentation walkthrough](PRESENTATION_WALKTHROUGH.md). Machine-readable results are in `docs/verification/`.
 
-- Docker Desktop installation and actual PostgreSQL integration verification.
-- Complete integrated monitoring and frontend browser acceptance.
-- Migration and backup/restore rehearsal on PostgreSQL.
-- Current 1,000 / 10,000 / 50,000 chunk performance and retrieval-quality benchmarks.
-- Final end-to-end verification, remaining integration fixes and release packaging.
+## Remaining checks and limits
 
-Historical reports under `docs/v1` and `archive/v1` apply only to the earlier demo. They do not verify Parity 2.0.
+A fresh Windows laptop's Docker/WSL and native full-model/PostgreSQL/GUI installation still requires a device rehearsal. Windows CI covers its automated native Python/SQLite/Chromium paths. True cold OS/database caches, total deployment peak memory, sustained full capture-worker throughput at scale, diverse relevance datasets and capacity beyond 50,000 chunks remain unmeasured. Native Linux local-chat setup is untested. These are not extrapolated from the Mac results.
+
+Structured PDF field mapping, authenticated sites and multi-user/public hosting are outside this release. Existing PDF extraction/search/citations remain supported. Monitoring runs only while the services/device are running.
+
+## Source and delivery
+
+Upstream remains `yajask-maker/parity` at the inspected checkpoint. This device's account has read-only access there, so branch `development/parity-v2-device-integration` is pushed to [the fork](https://github.com/sohamkamat28/parity/tree/development/parity-v2-device-integration) for upstream review. The pull request link is added here when created.
+
+The versioned source ZIP and SHA-256 manifest are generated locally under `outputs/`; the ZIP includes the exact Git revision in `BUILD_INFO.json`, source, operating documentation, tests and prebuilt frontend, and excludes secrets, runtime data, captures, dependencies and downloaded assets. Historical `docs/v1` and `archive/v1` reports do not verify v2.
