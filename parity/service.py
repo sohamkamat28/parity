@@ -98,8 +98,8 @@ class Service:
     def test_source(self,name,root_url,settings=None):
         started=time.perf_counter();source=self._prepare_source(name,root_url,settings)
         if source['config']['render_mode']=='browser':
-            from .browser import capture
-            response=capture(root_url,source,self.fetcher.demo_origin)
+            from .browser import preview_capture
+            response=preview_capture(self,root_url,source)
         else:response=self.fetcher.get(root_url,source)
         if response.status!=200:raise ValueError('Source returned HTTP '+str(response.status))
         doc=extract(response.body,response.headers.get('content-type','').split(';')[0],response.url,source['config'])

@@ -14,6 +14,23 @@ MAX_RESOURCES = 60
 MAX_CAPTURE_BYTES = 25 * 1024 * 1024
 
 
+def preview_capture(service, url, source):
+    """Interactive previews share the same Chromium reservation as capture workers."""
+    import time
+    from sqlalchemy import select
+    from .jobs import Jobs
+    from .db import uid
+    from .job_schema import resource_locks
+    owner='preview-'+uid()
+    with service.db.tx() as connection:
+        if not Jobs(service)._reserve(connection,resource_locks,'name','chromium',owner,time.time()):
+            raise ValueError('Chromium is capturing another page. Wait for that check to finish, then refresh the preview.')
+    try:return capture(url,source,service.fetcher.demo_origin)
+    finally:
+        with service.db.tx() as connection:
+            connection.execute(resource_locks.update().where(resource_locks.c.name=='chromium',resource_locks.c.owner==owner).values(owner=None,lease_until=0))
+
+
 def browser_status():
     """Inspect Playwright's pinned browser installation without starting a browser."""
     try:

@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-18",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "macos": "27.0.1",
+  "architecture": "arm64",
+  "python": "3.14.6",
+  "cpu": "Apple M4",
+  "logical_cpus": 10,
+  "memory_bytes": 17179869184,
+  "node": "v26.8.1",
+  "npm": "11.19.0",
+  "packages": {
+    "fastapi": "0.143.1",
+    "SQLAlchemy": "2.1.4",
+    "psycopg": "3.3.6",
+    "pgvector": "0.5.1",
+    "playwright": "1.64.0",
+    "sentence-transformers": "6.1.0",
+    "torch": "2.14.1",
+    "transformers": "5.19.0",
+    "pytest": "9.1.1"
+  },
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "local_answer_model": "qwen2.5-1.5b-instruct-q4_k_m",
+  "llama_runtime": "b11642 native macOS arm64",
+  "postgresql": "16.12 (Debian 16.12-1.pgdg12+1)",
+  "pgvector": "0.8.1"
+}

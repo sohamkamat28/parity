@@ -25,5 +25,6 @@ __pycache__/
 *.tsbuildinfo
 .DS_Store
 outputs/*.zip
+outputs/*.manifest.json
 outputs/runtime/
 # Compiled frontend is intentionally tracked

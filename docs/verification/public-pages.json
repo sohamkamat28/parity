@@ -1,0 +1,40 @@
+{
+  "checked_at": 1792295644.353018,
+  "optional_live_network": true,
+  "results": [
+    {
+      "url": "https://books.toscrape.com/",
+      "type": "currency",
+      "rule": {
+        "kind": "scalar",
+        "selector": "ol.row > li:first-child .price_color"
+      },
+      "status": "passed",
+      "normalized_sample": "51.77",
+      "unit": "GBP"
+    },
+    {
+      "url": "https://books.toscrape.com/",
+      "type": "list",
+      "rule": {
+        "kind": "list",
+        "selector": "ol.row",
+        "item_selector": ":scope > li"
+      },
+      "status": "passed",
+      "normalized_sample": "[{'key': 'https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html', 'text': 'A Light in the ... \u00a351.77 In stock Add to basket', 'url': 'https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html', 'date': None}, {'key': 'https://books.toscrape.com/catalogue/its-only-",
+      "unit": ""
+    },
+    {
+      "url": "https://www.w3schools.com/html/html_tables.asp",
+      "type": "table",
+      "rule": {
+        "kind": "table",
+        "selector": "#customers"
+      },
+      "status": "passed",
+      "normalized_sample": "{'headers': ['Company', 'Contact', 'Country'], 'rows': [{'key': 'Alfreds Futterkiste', 'label': 'Alfreds Futterkiste', 'values': {'Contact': 'Maria Anders', 'Country': 'Germany'}, 'cells': [{'period': 'Contact', 'raw_text': 'Maria Anders', 'value': 'Maria Anders', 'unit': ''}, {'period': 'Country', ",
+      "unit": ""
+    }
+  ]
+}

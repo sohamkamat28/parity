@@ -311,3 +311,55 @@ def test_postgres_lexical_rank_does_not_reward_generic_dense_candidates(system):
             c.execute(projection.insert().values(chunk_id=cid,source_id='rank-source',page_id=pid,version_id=vid,text=content,heading='Capacity',locator='Capacity',model_signature=service.embedder.signature,vector=vector))
     found=service.search('Project Aster88888 verified capacity MW',limit=10)
     assert any(r['page_id']=='rank-page-200' for r in found['results'])
+
+
+def test_preview_shares_worker_chromium_slot(system,monkeypatch):
+    service,m=system
+    from parity.job_schema import resource_locks
+    from parity.browser import preview_capture
+    from parity import browser
+    source=service.add_source('Browser fixture',URL,{'render_mode':'browser'})
+    with service.db.tx() as c:c.execute(resource_locks.insert().values(name='chromium',owner='capture-worker',lease_until=time.time()+120))
+    with pytest.raises(ValueError,match='Chromium is capturing another page'):
+        preview_capture(service,URL,source)
+    with service.db.tx() as c:c.execute(resource_locks.update().values(lease_until=0))
+    monkeypatch.setattr(browser,'capture',lambda *args:Response(URL,200,{},HTML.encode()))
+    assert preview_capture(service,URL,source).status==200
+    assert service.db.one(select(resource_locks))['owner'] is None
+
+
+def test_redirected_preview_failure_warns_the_original_requested_page(system,monkeypatch):
+    service,m=system
+    monkeypatch.setattr(service.fetcher,'get',lambda *args,**kwargs:Response(URL,200,{},HTML.encode()))
+    preview=m.preview({'root_url':URL.rstrip('/'),'instructions':'Current Price','use_ai':False})
+    field=next(f for f in preview['candidates'] if f['name']=='Current Price')
+    activated=m.activate({'draft_id':preview['draft_id'],'fields':[field]})
+    assert activated['monitor']['root_url']==URL
+    m.process_error(activated['source'],'redirect-failure',URL.rstrip('/'),'The website returned 403',403)
+    field=m.dashboard()['widgets'][0]
+    assert field['status']=='stale' and field['value']=='1200.5' and '403' in field['error']
+    with pytest.raises(ValueError,match='different website URL'):
+        m.preview({'source_id':activated['source']['id'],'root_url':'https://other.example/'})
+
+
+def test_all_five_mcp_tools_through_authenticated_api_bridge(system,monkeypatch):
+    import socket,subprocess
+    service,m=system;populate(service,m)
+    with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
+    monkeypatch.setattr(config,'API_PORT',port);monkeypatch.setenv('PARITY_ADMIN_TOKEN','protocol-test-only')
+    env={**os.environ,'DATABASE_URL':service.db.engine.url.render_as_string(hide_password=False),'PARITY_DATA_DIR':str(config.DATA),'PARITY_PORT':str(port),'PARITY_EMBEDDER':'lexical','PARITY_EXTERNAL_WORKERS':'1'}
+    proc=subprocess.Popen([sys.executable,'-m','uvicorn','parity.api:app','--host','127.0.0.1','--port',str(port),'--no-access-log'],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    try:
+        import httpx
+        with httpx.Client(trust_env=False,timeout=1) as client:
+            for _ in range(100):
+                try:
+                    if client.get(f'http://127.0.0.1:{port}/health/ready').status_code==200:break
+                except httpx.HTTPError:pass
+                time.sleep(.1)
+            else:raise AssertionError('API bridge did not start')
+        from parity.integrations import test_mcp
+        result=asyncio.run(test_mcp(service))
+        assert result['status']=='passed',result
+        assert len(result['tools'])==5 and all(t['success'] for t in result['tools'])
+    finally:proc.terminate();proc.wait(timeout=10)

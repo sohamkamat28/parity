@@ -1,58 +1,62 @@
-# Parity
+# Parity 2.0
 
-Website monitoring, captured evidence, version history and local AI chat.
+Website monitoring, immutable evidence, version history and free local AI chat. Track reviewed fields on public HTML pages and inspect their changes without asking chat. PDF extraction, document search, REST, CLI and all five MCP tools remain available.
 
-**Current snapshot: Parity 2.0 development, 17 October 2026.** The source and compiled frontend are included. Integration and acceptance testing are still in progress; this is not a completed production release.
+**Development candidate, 18 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks. Historical reports in `archive/v1` and `docs/v1` do not verify this version.
 
-## Repository structure
+## Fresh Windows installation
 
-| Path | Contents |
-| --- | --- |
-| `parity/` | FastAPI service, monitoring rules, immutable observations, durable workers, retrieval and chat |
-| `frontend/src/` | React and TypeScript dashboard and source setup |
-| `frontend/dist/` | Prebuilt frontend, served by the Python application |
-| `mock_portal/` | Controlled website fixtures for testing |
-| `scripts/` | Model setup, validation, migration and backup utilities |
-| `tests/` | Lifecycle, monitoring, worker and chat tests |
-| `docs/` | Current status and historical operating documentation |
-| `archive/v1/` | Previously delivered Windows demo source, kept separate from 2.0 |
-
-## Windows development setup
-
-Install Python 3.14 and Docker Desktop with its WSL 2 backend. Start Docker Desktop, then run in the repository directory:
+Install Python 3.14 and Docker Desktop with Linux containers and its WSL 2 backend. Open Docker Desktop and wait for the engine. In a fresh clone:
 
 ```powershell
+git clone https://github.com/yajask-maker/parity.git
+cd parity
+# Check out the reviewed development branch/PR before setup.
 .\setup.bat
 .\start.bat
 ```
 
-Setup downloads dependencies, Chromium and local model assets. PostgreSQL with pgvector is the default application profile. Node is needed only when rebuilding the frontend.
+Setup uses pinned Python dependencies, verified llama.cpp/Qwen downloads, MiniLM and matching Chromium. No paid API key or Node installation is needed to use the bundled frontend. Follow [the operating guide](docs/OPERATING_GUIDE.md) for the exact development branch, Docker prerequisites, configuration, backup and migration commands.
 
-Explicit SQLite compatibility profile:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Profile sqlite
-.\start.bat --profile sqlite
-```
-
-Monitoring-only development startup (without answer and embedding models):
+A monitoring-only setup can omit models, and browser support can be omitted for static HTML:
 
 ```powershell
-.\start.bat --profile sqlite --without-models
+.\setup.bat -WithoutModels
+.\start.bat --without-models
 ```
 
-These are current implementation entry points; full 2.0 Windows/Docker acceptance remains pending. See [implementation status](docs/IMPLEMENTATION_STATUS.md) before presenting this snapshot.
+SQLite is an explicit compatibility profile: `setup.bat -Profile sqlite`, then `start.bat --profile sqlite`. PostgreSQL/pgvector is the default. Monitoring runs while the services run, even with the browser tab closed; it stops when the device or services stop.
 
-## Frontend development
+## macOS development
 
-```powershell
-cd frontend
-npm ci
-npm run build
+Use Python 3.14 and Docker Desktop. This device was verified with Python 3.14.6 on an Apple M4 Mac.
+
+```sh
+python3.14 -m venv .venv
+.venv/bin/python scripts/setup.py
+.venv/bin/python run.py
 ```
 
-## Data and credentials
+The native local-chat download supports macOS arm64 and Windows x64. Linux and other architectures can supply `PARITY_LLAMA_SERVER` and the verified GGUF; that native configuration has not been exercised here.
 
-No API key is required for the default local chat model. Optional OpenAI configuration belongs in your ignored local `.env` file. Databases, captures, personal installation data, downloaded models, browsers, dependencies and credentials are excluded from this repository. No user data has been migrated by this upload.
+## Verification and frontend build
 
-Monitoring runs while the Python services are running, even when the browser tab is closed. This release targets a single local user and public websites.
+```sh
+.venv/bin/python scripts/test.py --postgres
+.venv/bin/python scripts/browser_acceptance.py
+.venv/bin/python scripts/browser_acceptance.py --with-models
+npm --prefix frontend ci
+npm --prefix frontend run build
+```
+
+Windows uses `.venv\Scripts\python.exe`. PostgreSQL tests create disposable `parity_test_*` databases through `PARITY_TEST_DATABASE_URL` or the locally configured PostgreSQL connection; use a dedicated development server with database-creation permission. Live-network checks and model benchmarks are optional and separate from deterministic CI.
+
+## Files and data
+
+- `parity/`: API, structured monitoring, durable workers, retrieval, chat and transfer tools.
+- `frontend/src/` and `frontend/dist/`: editable React source and prebuilt application.
+- `scripts/`: setup, validation, explicit migration, backup and packaging.
+- `docs/`: [operating guide](docs/OPERATING_GUIDE.md), [presentation walkthrough](docs/PRESENTATION_WALKTHROUGH.md), [status](docs/IMPLEMENTATION_STATUS.md), verification results.
+- `outputs/`: versioned local source ZIP and manifest after packaging.
+
+Configuration belongs in an ignored `.env`. Data/cache directories are configurable and relative values resolve from the repository, regardless of the launch directory. No databases, captures, credentials or downloaded assets belong in Git. Setup does not import an old installation; SQLite-to-PostgreSQL transfer requires an explicit source path and creates a verified backup first.

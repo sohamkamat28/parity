@@ -115,14 +115,16 @@ class MonitorService:
             source_id = payload.get('source_id')
             current = self.service.source(source_id) if source_id else None
             root = payload.get('root_url') or (current['root_url'] if current else '')
+            if current and canonical(root) != canonical(current['root_url']):
+                raise ValueError('Add a separate source to monitor a different website URL.')
             settings = dict(current['config']) if current else {'max_pages': 1, 'max_depth': 0, 'interval': 900, 'scope_mode': 'page', 'allow': [urlsplit(root).path or '/']}
             settings.update(payload.get('settings') or {})
             source = self.service._prepare_source(payload.get('name') or (current['name'] if current else urlsplit(root).hostname or 'Website'), root, settings)
             if source_id:
                 source['id'] = source_id
             if source['config'].get('render_mode') == 'browser':
-                from .browser import capture as render
-                response = render(source['root_url'], source, self.service.fetcher.demo_origin)
+                from .browser import preview_capture
+                response = preview_capture(self.service, source['root_url'], source)
             else:
                 response = self.service.fetcher.get(source['root_url'], source)
             if response.status != 200:
@@ -302,7 +304,7 @@ class MonitorService:
 
     def process_error(self, source, run_id, url, error, status=None, revisions=None):
         revisions = self.snapshot_revisions(source['id']) if revisions is None else revisions
-        relevant = [revision for revision in revisions if revision['root_url'] == url]
+        relevant = [revision for revision in revisions if revision['root_url'] == url or url == source['root_url']]
         counts = {'observations': 0, 'changed': 0}
         state = 'unavailable' if status in (404, 410) else 'stale'
         with self.db.tx() as connection:

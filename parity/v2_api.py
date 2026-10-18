@@ -23,6 +23,8 @@ def service_status(service):
             response=client.get(os.getenv('PARITY_EMBEDDING_URL','http://127.0.0.1:8092')+'/health/ready')
             result['embedding']=response.json()
     except Exception:result['embedding']={'status':'unavailable','error':'Start the embedding service to enable semantic search. Website monitoring continues.'}
+    if result['embedding'].get('status')!='ready' and result['indexing']['status']!='stopped':
+        result['indexing'].update(status='degraded',error='Embedding service unavailable. Captures and monitored values continue; indexing will retry.')
     return result
 
 def _normal(stmt):

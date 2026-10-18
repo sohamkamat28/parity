@@ -1,0 +1,20 @@
+{
+  "models": "enabled",
+  "checks": [
+    "Four-step source setup, reviewed scalar/table/list fields, preserved 10-second fixture schedule",
+    "Dashboard zero/currency/table/list rendering and default demo isolation with PostgreSQL",
+    "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
+    "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
+    "Failed HTTP check retains previous verified value and warning; next successful check recovers",
+    "Polling fallback delivers scheduled announcement updates",
+    "390px layout, keyboard navigation, focus management and reduced-motion setting",
+    "Scheduled monitoring continues with browser tab closed; layout persists",
+    "Native free Qwen chat selects immutable evidence with shared MiniLM available"
+  ],
+  "screenshots": [
+    "outputs/runtime/browser-f93aa3a1cea5496c990cc769683bcc9c/desktop.png",
+    "outputs/runtime/browser-f93aa3a1cea5496c990cc769683bcc9c/narrow.png"
+  ],
+  "console_errors": [],
+  "status": "passed"
+}
