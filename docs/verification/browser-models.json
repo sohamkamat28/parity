@@ -1,8 +1,9 @@
 {
   "models": "enabled",
   "checks": [
+    "Settings UI, retired sample endpoints and legacy static app are absent",
     "Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps",
-    "Dashboard zero/currency/table/list rendering and default demo isolation with PostgreSQL",
+    "Dashboard zero/currency/table/list rendering and normal source inclusion with PostgreSQL",
     "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
     "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
     "Failed HTTP check retains previous verified value and warning; next successful check recovers",
@@ -13,8 +14,8 @@
     "Native free Qwen chat selects immutable evidence with shared MiniLM available"
   ],
   "screenshots": [
-    "outputs/runtime/browser-677db7da6fed409fa7d993db47a12211/desktop.png",
-    "outputs/runtime/browser-677db7da6fed409fa7d993db47a12211/narrow.png"
+    "outputs/runtime/browser-83eda3f7d3334c0ca69c7759f30f1d16/desktop.png",
+    "outputs/runtime/browser-83eda3f7d3334c0ca69c7759f30f1d16/narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

@@ -2,7 +2,7 @@
 
 Website monitoring, immutable evidence, version history and free local AI chat. Track reviewed fields on public HTML pages and inspect their changes without asking chat. PDF extraction, document search, REST, CLI and all five MCP tools remain available.
 
-**Development candidate, 18 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks. Historical reports in `archive/v1` and `docs/v1` do not verify this version.
+**Development candidate, 18 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks.
 
 ## Fresh Windows installation
 

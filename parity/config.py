@@ -19,7 +19,6 @@ from urllib.parse import quote
 PROFILE = os.getenv('PARITY_PROFILE', 'postgresql')
 DATABASE_URL = os.getenv("DATABASE_URL") or ('sqlite:///'+str(DATA/'parity.db') if PROFILE == 'sqlite' else
     'postgresql+psycopg://parity:'+quote(os.getenv('PARITY_DB_PASSWORD',''),safe='')+'@127.0.0.1:'+os.getenv('PARITY_DB_PORT','5432')+'/parity')
-DEMO_ORIGIN = os.getenv("DEMO_ORIGIN", "http://127.0.0.1:8080").rstrip("/")
 EMBEDDER = os.getenv("PARITY_EMBEDDER", "minilm")
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MODEL_REVISION = os.getenv("PARITY_MODEL_REVISION", "1110a243fdf4706b3f48f1d95db1a4f5529b4d41")

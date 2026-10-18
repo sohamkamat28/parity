@@ -1,10 +1,10 @@
 # Parity 2.0 presentation walkthrough
 
-Use the current verification report, not v1 reports, to describe what has been demonstrated. Keep the launcher visible on the device. Do not present a development checkpoint as an independently certified production release.
+Use the current verification report to describe what has been demonstrated. Keep the launcher visible on the device. Do not present a development checkpoint as an independently certified production release.
 
 ## Before the walkthrough
 
-- Run setup and launch the PostgreSQL profile. In Settings → System status, inspect database, monitoring, rendering, embedding, indexing and chat separately. A missing model can coexist with working monitoring.
+- Run setup and launch the PostgreSQL profile. Through `GET /api/runtime`, inspect database, monitoring, rendering, embedding, indexing and chat separately. A missing model can coexist with working monitoring.
 - Use a public page you are allowed to fetch, or the clearly labelled synthetic fixtures below. Never use personal installation data for a demonstration.
 - For a repeatable complete rehearsal, run `python scripts/browser_acceptance.py`; use `--with-models` to include native free chat. The script owns a disposable database and stops its owned services when finished. Reports go to `docs/verification/`; screenshots/data remain ignored under `outputs/runtime/`.
 
@@ -24,7 +24,7 @@ For synthetic financial-style values, explicitly say they are test data. Show th
 
 Change a controlled fixture and wait for the next scheduled check. Do not ask chat and do not click Check now. Show the dashboard change and stored evidence. Then change an unrelated footer: verification advances without a field-change event.
 
-The automated browser rehearsal demonstrates this using the synthetic `/en/metrics` fixture. It also blocks SSE to verify polling fallback and closes the browser tab to prove worker monitoring continues. Test sources remain excluded from normal views until explicitly included.
+The automated browser rehearsal demonstrates this using the synthetic `/en/metrics` fixture. It also blocks SSE to verify polling fallback and closes the browser tab to prove worker monitoring continues. The fixture runs only inside the isolated acceptance database, outside the application launcher.
 
 ## 4. Show failure and recovery
 
@@ -38,7 +38,7 @@ Ask a specific question about a monitored value or a current document. Open its 
 
 Select a historical time and ask again; the request performs fresh historical retrieval. Show that an older document cannot be substituted as current while the newest version awaits indexing. Explain the Search index updating message.
 
-Default chat is free and local: Qwen selects supporting evidence and the server constructs the cited answer. Optional OpenAI configuration is separate and is not needed for the walkthrough. Demonstration sources require explicit source selection for retrieval tests.
+Default chat is free and local: Qwen selects supporting evidence and the server constructs the cited answer. Optional OpenAI configuration is separate and is not needed for the walkthrough. Use an explicit source selection to compare answers from different websites.
 
 ## 6. Explain operating boundaries and preservation
 

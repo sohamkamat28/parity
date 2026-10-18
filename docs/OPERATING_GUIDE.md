@@ -66,7 +66,7 @@ Copy `.env.example` only when `.env` does not already exist. Relevant settings:
 
 Relative data/cache paths resolve against the repository directory, not your terminal's working directory. Absolute paths can point outside the repository. Keep `.env`, data, captures, model assets, dependencies and access tokens out of Git. Optional paid OpenAI support remains configurable; normal operation and CI do not require credentials.
 
-`/health/live` reports the API process; `/health/ready` checks the database. Settings → System status separately reports monitoring workers, Chromium, indexing, the embedding service and chat. A downloaded model is not proof that its service is running. If embedding/chat fails, static monitoring continues and indexing retries independently. Logs live under `PARITY_DATA_DIR/logs` and can contain launch access tokens; do not publish them.
+`/health/live` reports the API process; `/health/ready` checks the database. `GET /api/runtime` separately reports monitoring workers, Chromium, indexing, the embedding service and chat. A downloaded model is not proof that its service is running. If embedding/chat fails, static monitoring continues and indexing retries independently. Logs live under `PARITY_DATA_DIR/logs` and can contain launch access tokens; do not publish them.
 
 ## Set up a monitor
 
@@ -88,7 +88,7 @@ Changes & History lists tracked field changes, document changes and versions. As
 
 Local chat selects evidence; the server constructs monitored values and supported comparable differences/percentage changes. Operands must share a unit and reporting period. Percentage change from zero is undefined. Calculation citations link both immutable captures. Evidence content is treated as untrusted; it cannot issue instructions to the application.
 
-Demo Lab lives under Settings → Demo & Testing. Demo/benchmark sources are excluded from normal dashboards and default retrieval. Include test sources explicitly to inspect their monitoring; explicit source IDs allow testing chat/search. All demonstration numbers are synthetic.
+The application has four screens: Dashboard, Sources, Changes & History and Ask Parity. Readiness remains available through `/api/runtime` and `/health/ready`. Automated verification uses isolated fixtures under `tests/support`; these are not launched by normal setup or `run.py`. Retired sample-source records remain excluded from default views to preserve stored histories without resurfacing old sample content.
 
 ## Backup and restore
 

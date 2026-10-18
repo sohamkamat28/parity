@@ -23,7 +23,7 @@ from parity.service import Service
 from parity.structured import extract_field
 from parity.transfer import backup_database, restore_database, verify_backup, migrate_sqlite
 from parity.v2_api import create_router, event_batch
-from test_monitoring import HTML, URL, FixtureFetcher
+from tests.test_monitoring import HTML, URL, FixtureFetcher
 
 
 @pytest.fixture
@@ -88,7 +88,7 @@ def test_frozen_rules_interruption_and_no_duplicate_observations(system,monkeypa
     monkeypatch.setattr(service,'_publish',crash)
     with pytest.raises(KeyboardInterrupt):Jobs(service).capture_once(activated['run']['id'])
     count=service.db.one(select(func.count().label('n')).select_from(monitor_observations))['n']
-    from test_jobs import expire_claim
+    from tests.test_jobs import expire_claim
     expire_claim(service);monkeypatch.setattr(service,'_publish',original)
     assert Jobs(service).capture_once(activated['run']['id'])['status']=='succeeded'
     assert service.db.one(select(func.count().label('n')).select_from(monitor_observations))['n']==count
@@ -170,7 +170,10 @@ def populate(service,m):
 
 
 def test_populated_backup_restore_hashes_and_evidence(system,tmp_path):
-    service,m=system;populate(service,m)
+    service,m=system;activated=populate(service,m)
+    from parity.db import _legacy_session_records
+    with service.db.tx() as c:
+        c.execute(_legacy_session_records.insert().values(id='retired-session',name='Retired metadata',static_source_id=activated['source']['id'],browser_source_id=activated['source']['id'],portal_url='http://127.0.0.1:8080/retired',created_at=1))
     archive=tmp_path/'saved.zip';backup_database(service.db.engine.url,config.DATA,archive)
     manifest=verify_backup(archive)
     target='sqlite:///'+str(tmp_path/'restored.sqlite')
@@ -178,7 +181,7 @@ def test_populated_backup_restore_hashes_and_evidence(system,tmp_path):
     assert result['verified']
     copied=tmp_path/'copied.zip';backup_database(target,tmp_path/'restored-data',copied)
     after=verify_backup(copied)
-    for name in ('versions','chunks','monitor_observations','monitor_changes','chat_messages','search_projection'):
+    for name in ('versions','chunks','monitor_observations','monitor_changes','chat_messages','search_projection','demo_sessions'):
         assert manifest['tables'][name]==after['tables'][name]
     assert manifest['files']==after['files'] and len(manifest['files'])>=2
     with pytest.raises(ValueError,match='empty'):
@@ -235,7 +238,7 @@ from parity.service import Service
 from parity.jobs import Jobs
 from parity.fetch import Response
 class Fetcher:
-    demo_origin='http://127.0.0.1:8080'
+    fixture_origin='http://127.0.0.1:8080'
     def get(self,url,source,headers=None):return Response(url,200,{'content-type':'text/html'},Path(os.environ['FIXTURE_PATH']).read_bytes())
 service=Service(DB(),fetcher=Fetcher(),inline_index=False)
 jobs=Jobs(service)
@@ -249,7 +252,7 @@ jobs.capture_once(os.environ['RUN_ID'])
     env={**os.environ,'DATABASE_URL':service.db.engine.url.render_as_string(hide_password=False),'PARITY_DATA_DIR':str(config.DATA),'RUN_ID':activated['run']['id'],'FIXTURE_PATH':str(html_path)}
     stopped=subprocess.run([sys.executable,'-c',code],env=env,timeout=20,capture_output=True)
     assert stopped.returncode==99,stopped.stderr.decode()[-500:]
-    from test_jobs import expire_claim
+    from tests.test_jobs import expire_claim
     expire_claim(service);service.fetcher.body=HTML.replace('Rs. 1,200.50','Rs. 999')
     assert Jobs(service).capture_once(activated['run']['id'])['status']=='succeeded'
     assert Jobs(service).capture_once(activated['run']['id']) is None

@@ -124,7 +124,7 @@ def backup_database(database_url,data_dir,destination):
                                 row=_row(row);encoded=_line(row);output.write(encoded);checksum.update(encoded);count+=1
                                 references.update(_references(table.name,row))
                         manifest['tables'][table.name]={'count':count,'sha256':checksum.hexdigest(),'columns':columns}
-                # Portal fixture state is a separate SQLite database; snapshot its WAL too.
+                # Preserve an existing retired auxiliary database in legacy backups; never create it.
                 portal=data/'portal.sqlite'
                 if portal.is_file():
                     portal_copy=temporary/'portal.sqlite';_sqlite_snapshot(portal,portal_copy)

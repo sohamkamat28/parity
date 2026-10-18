@@ -1,4 +1,4 @@
-"""Start Parity, its fixture portal, and the optional free local answer model.
+"""Start Parity and its optional free local models.
 
 Only processes created by this invocation are stopped. Run setup.bat once to
 install dependencies and cache models before launching.
@@ -42,18 +42,6 @@ def ensure_ports_available(ports):
             except OSError as error:
                 raise LaunchError(f"Port {port} ({name}) is occupied. Stop its existing server or "
                     "choose another port in .env. No existing process was stopped.") from error
-
-
-def portal_port(origin):
-    try:
-        parsed = urllib.parse.urlsplit(origin)
-        if (parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost")
-                or parsed.path not in ("", "/") or parsed.query or parsed.fragment
-                or parsed.username or parsed.password):
-            raise ValueError
-        return parsed.port or 80
-    except ValueError as error:
-        raise LaunchError("DEMO_ORIGIN must be a loopback HTTP origin, such as http://127.0.0.1:8080.") from error
 
 
 class OwnedProcesses:
@@ -201,8 +189,7 @@ def main(argv=None):
         provider = config.CHAT_PROVIDER.lower().strip()
         if provider not in ("local", "openai"):
             raise LaunchError("PARITY_CHAT_PROVIDER must be local or openai.")
-        demo_port = portal_port(config.DEMO_ORIGIN)
-        ports = [("Parity", config.API_PORT), ("fixture portal", demo_port)]
+        ports = [("Parity", config.API_PORT)]
         if not args.without_models:ports.append(('embedding',config.EMBEDDING_PORT))
         if provider == "local" and not args.without_models:
             ports.append(("local chat", config.LOCAL_CHAT_PORT))
@@ -238,7 +225,6 @@ def main(argv=None):
         env['PARITY_EMBEDDING_TOKEN']=secrets.token_urlsafe(32)
         token = env.get("PARITY_ADMIN_TOKEN", "").strip() or secrets.token_urlsafe(24)
         env["PARITY_ADMIN_TOKEN"] = token
-        env["DEMO_ADMIN_TOKEN"] = env.get("DEMO_ADMIN_TOKEN", "").strip() or secrets.token_urlsafe(24)
         env["PARITY_BOOTSTRAP_TOKEN"] = secrets.token_urlsafe(32)
         env["PARITY_CHAT_PROVIDER"] = provider
         env["PARITY_LOCAL_CHAT_TOKEN"] = secrets.token_urlsafe(32)
@@ -248,7 +234,7 @@ def main(argv=None):
         logs = config.DATA / "logs"
         logs.mkdir(parents=True, exist_ok=True)
         owned = OwnedProcesses(logs)
-        owned.optional={'local-chat','embedding','index-worker','portal'}
+        owned.optional={'local-chat','embedding','index-worker'}
         checks = {}
         print("Starting Parity. Loading cached models may take a moment.", flush=True)
         if local_command:
@@ -257,24 +243,22 @@ def main(argv=None):
             owned.start('embedding',[sys.executable,'-m','uvicorn','parity.embedding_server:app','--host','127.0.0.1','--port',str(config.EMBEDDING_PORT),'--no-access-log'],root,env)
         for role,name in [('scheduler','scheduler-worker'),('capture','capture-1-worker'),('capture','capture-2-worker'),('index','index-worker')]:
             owned.start(name,[sys.executable,'-m','parity.worker','--role',role],root,env)
-        for name, app, port in [("portal", "mock_portal.app:app", demo_port),
-                                ("parity", "parity.api:app", config.API_PORT)]:
+        for name, app, port in [("parity", "parity.api:app", config.API_PORT)]:
             owned.start(name, [sys.executable, "-m", "uvicorn", app, "--host", "127.0.0.1",
                 "--port", str(port), "--no-access-log"], root, env)
         base = f"http://127.0.0.1:{config.API_PORT}"
         checks["Application and database"] = base + "/health/ready"
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         wait_ready(owned, checks, args.startup_timeout, opener)
-        print('  Monitoring is independent of model startup. Check Settings for each service status.',flush=True)
+        print('  Monitoring is independent of model startup. Service status is available at /api/runtime.',flush=True)
         if provider == "openai":
             configured = bool(env.get("OPENAI_API_KEY", "").strip())
-            print("  OpenAI chat: " + ("configured; test the connection in Settings" if configured
+            print("  OpenAI chat: " + ("configured; test the connection at /api/chat/test" if configured
                 else "not configured; add OPENAI_API_KEY to .env or use PARITY_CHAT_PROVIDER=local"), flush=True)
         link = base + "/#token=" + urllib.parse.quote(env["PARITY_BOOTSTRAP_TOKEN"], safe="")
         print("\nPARITY: " + base, flush=True)
         print("Connect automatically (one use): " + link, flush=True)
         print("Parity access token (reusable during this launch): " + token, flush=True)
-        print(f"Fixture portal: http://127.0.0.1:{demo_port}/en/circulars/", flush=True)
         print("Logs: " + str(logs), flush=True)
         print("Keep this window open. Ctrl+C stops Parity and its owned services.\n", flush=True)
         if not args.no_browser:

@@ -1,4 +1,4 @@
-export type Source = {id:string;name:string;root_url:string;config:Record<string,any>;enabled:boolean;paused:boolean;next_due:number;lease_until:number;created_at:number;is_demo?:boolean;document_count?:number;last_verified_at?:number};
+export type Source = {id:string;name:string;root_url:string;config:Record<string,any>;enabled:boolean;paused:boolean;next_due:number;lease_until:number;created_at:number;document_count?:number;last_verified_at?:number};
 export type Page = {id:string;source_id:string;url:string;title:string;availability:string;health:string;current_id?:string;last_version_id?:string;checked_at?:number;verified_at?:number;last_error?:string};
 export type Run = {id:string;source_id:string;status:string;created_at:number;started_at?:number;finished_at?:number;metrics:Record<string,number|boolean>;error?:string};
 export type Change = {id:string;page_id:string;source_id?:string;kind:string;at:number;title:string;url:string;detail:Record<string,any>;old_version_id?:string;new_version_id?:string};
@@ -9,7 +9,6 @@ export type History = {versions:Version[];events:Change[];intervals:{id:string;v
 export type SupportingCapture={capture_id:string;value:any;unit?:string;period?:string;locator?:string;at?:number};
 export type Citation = {supporting_captures?:SupportingCapture[];id?:string|number;chunk_id?:string;page_id:string;version_id:string;number:number;url:string;title:string;text:string;locator:string;last_verified_at?:number;warnings?:string[];capture_id?:string;monitor_id?:string;field_id?:string};
 export type ChatMessage = {id:string;role:string;content:string;citations?:Citation[];warnings?:string[];status?:string};
-export type DemoSession = {id:string;name:string;static_source_id:string;browser_source_id:string;portal_url:string;created_at:number;state?:Record<string,any>};
 export const EMPTY:Overview={sources:[],pages:[],runs:[],changes:[],totals:{}};
 export type PageResult<T>={items:T[];next_cursor:string|null;total:number};
 export type FieldType='text'|'number'|'currency'|'percentage'|'date'|'table'|'list';

@@ -9,7 +9,7 @@ from .fetch import Fetcher, FetchError, Response, canonical, in_scope, resource_
 
 class BudgetFetcher(Fetcher):
     def __init__(self,payload):
-        super().__init__(payload.get("demo_origin"))
+        super().__init__(payload.get("fixture_origin"))
         self.deadline=time.monotonic()+max(1,payload["seconds"]-3)
         self.max_resources=payload["max_resources"]
         self.max_total=payload["max_bytes"]

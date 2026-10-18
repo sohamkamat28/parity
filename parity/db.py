@@ -73,7 +73,8 @@ chat_messages = Table("chat_messages", meta,
     Column("context", JSON, nullable=False, default=dict), Column("status", String, nullable=False),
     Column("model", String), Column("elapsed_ms", Integer, default=0),
     Column("created_at", Float, nullable=False), UniqueConstraint("conversation_id", "ordinal"))
-demo_sessions = Table("demo_sessions", meta,
+# Retained only for lossless migration/backup of existing installations.
+_legacy_session_records = Table("demo_sessions", meta,
     Column("id", String, primary_key=True), Column("name", Text, nullable=False),
     Column("static_source_id", ForeignKey("sources.id")),
     Column("browser_source_id", ForeignKey("sources.id")), Column("portal_url", Text, nullable=False),
@@ -82,7 +83,7 @@ demo_sessions = Table("demo_sessions", meta,
 from . import monitor_schema, job_schema, search_schema
 _V3_TABLES = tuple(monitor_schema.register(meta).values()) + tuple(job_schema.register(meta).values()) + tuple(search_schema.register(meta).values())
 SCHEMA_VERSION = 3
-_V2_TABLES = (chat_conversations, chat_messages, demo_sessions)
+_V2_TABLES = (chat_conversations, chat_messages, _legacy_session_records)
 
 
 def migrate(connection):

@@ -31,20 +31,17 @@ class Service:
     def _prepare_source(self,name,root_url,settings=None):
         root_url=canonical(root_url)
         settings=settings or {}
-        if settings.get("demo") and origin(root_url)!=config.DEMO_ORIGIN:
-            raise ValueError("Demo exception is restricted to the configured fixture origin")
         if not name.strip(): raise ValueError("Source name is required")
         defaults={"allow":["/"],"deny":["/admin","/login"],"selector":"","exclude":".render-timestamp,#cookie-banner",
                   "seeds":[root_url],"discovery_only":[],"max_pages":100,"max_depth":3,
-                  "delay":1.0,"interval":21600,"missing_interval":21600,"max_bytes":10*1024*1024,"demo":False,
+                  "delay":1.0,"interval":21600,"missing_interval":21600,"max_bytes":10*1024*1024,
                   "render_mode":"static","ready_selector":"","resource_origins":[],
                   "source_kind":"normal","scope_mode":"section"}
         allowed=set(defaults)|{"max_bytes"}
         if set(settings)-allowed: raise ValueError("Unknown source configuration field")
         defaults.update(settings)
-        if defaults['source_kind'] not in ('normal','demo','benchmark'):raise ValueError('Invalid source_kind')
+        if defaults['source_kind'] not in ('normal','benchmark'):raise ValueError('Invalid source_kind')
         if defaults['scope_mode'] not in ('page','section','site'):raise ValueError('Invalid scope_mode')
-        if defaults['demo']:defaults['source_kind']='demo'
         for field,lo,hi in [("max_pages",1,500),("max_depth",0,6),("delay",0,60),
                             ("interval",10,604800),("missing_interval",0,604800),("max_bytes",1,10*1024*1024)]:
             if not isinstance(defaults[field],(float,int)) or not lo<=defaults[field]<=hi:
@@ -60,7 +57,7 @@ class Service:
             if defaults[field]:
                 try:soupsieve.compile(defaults[field])
                 except Exception as error:raise ValueError('Invalid CSS selector: '+field) from error
-        if not defaults["demo"]:
+        if getattr(self.fetcher,"fixture_origin",None) != origin(root_url):
             defaults["delay"]=max(0.5,defaults["delay"])
             defaults["missing_interval"]=max(60,defaults["missing_interval"])
         for key in ["allow","deny","seeds","discovery_only","resource_origins"]:
@@ -111,15 +108,6 @@ class Service:
         rules['resource_origins']=sorted(source['config'].get('resource_origins',[]))
         signature='extract-v3:'+hashlib.sha256(json.dumps(rules,sort_keys=True).encode()).hexdigest()[:16]
         return signature+':'+self.model().signature if self.inline_index else signature
-
-    def seed_demo(self):
-        existing=self.db.one(select(sources).where(sources.c.root_url==config.DEMO_ORIGIN+"/en/circulars/"))
-        if existing:return existing
-        return self.add_source("KJSCE · demonstration",config.DEMO_ORIGIN+"/en/circulars/",
-            {"demo":True,"allow":["/en/"],"deny":["/admin","/test"],
-             "seeds":[config.DEMO_ORIGIN+"/en/circulars/",config.DEMO_ORIGIN+"/en/sitemap.xml"],
-             "discovery_only":["/en/","/en/circulars/","/en/sitemap.xml"],
-             "selector":"article","delay":0,"interval":60,"missing_interval":2})
 
     def source(self,source_id):
         s=self.db.one(select(sources).where(sources.c.id==source_id))
@@ -226,7 +214,7 @@ class Service:
                         try:
                             if rendered:
                                 from .browser import capture
-                                response=capture(url,source,self.fetcher.demo_origin)
+                                response=capture(url,source,getattr(self.fetcher,"fixture_origin",None))
                             else:response=self.fetcher.get(url,source,headers)
                         except FetchError:
                             if attempt==2:raise

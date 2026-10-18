@@ -82,7 +82,7 @@ class Embedder:
                 response.raise_for_status()
                 return response.json()
         except Exception as error:
-            raise ValueError('Search indexing service is unavailable. Monitoring continues; check Settings for service status.') from error
+            raise ValueError('Search indexing service is unavailable. Monitoring continues; check /api/runtime for service status.') from error
 
 def cosine(a,b):
     return float(sum(x*y for x,y in zip(a,b)))

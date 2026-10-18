@@ -67,8 +67,8 @@ class Response:
 
 class Fetcher:
     """Connects directly to a validated address; TLS checks the original hostname."""
-    def __init__(self, demo_origin=None):
-        self.demo_origin = demo_origin or config.DEMO_ORIGIN
+    def __init__(self, fixture_origin=None):
+        self.fixture_origin = fixture_origin
         self.last_request={}
         self.robots={}
         self.robots_checked={}
@@ -78,18 +78,16 @@ class Fetcher:
         if origin(u) not in {origin(source["root_url"]),*source["config"].get("resource_origins",[])}:
             raise FetchError("Cross-origin request blocked")
         p=urlsplit(u)
-        demo=source["config"].get("demo",False) and origin(u)==self.demo_origin
-        if source["config"].get("demo") and origin(source["root_url"])!=self.demo_origin:
-            raise FetchError("Invalid demo origin")
+        fixture=self.fixture_origin is not None and origin(u)==self.fixture_origin
         addresses=list(dict.fromkeys(x[4][0] for x in socket.getaddrinfo(
             p.hostname,p.port or (443 if p.scheme=="https" else 80),type=socket.SOCK_STREAM)))
         if not addresses: raise FetchError("DNS returned no addresses")
         for addr in addresses:
             ip=ipaddress.ip_address(addr)
             if ip.version==6 and ip.ipv4_mapped: ip=ip.ipv4_mapped
-            if demo and not ip.is_loopback:
-                raise FetchError("Demo destination must resolve only to loopback")
-            if not demo and not ip.is_global:
+            if fixture and not ip.is_loopback:
+                raise FetchError("Test fixture destination must resolve only to loopback")
+            if not fixture and not ip.is_global:
                 raise FetchError("Non-public destination blocked")
         return addresses
 
@@ -134,7 +132,7 @@ class Fetcher:
 
     def _robots_for(self,url,source):
         key=origin(url)
-        if source["config"].get("demo") and key==self.demo_origin:return None
+        if self.fixture_origin is not None and key==self.fixture_origin:return None
         if key not in self.robots or time.monotonic()-self.robots_checked.get(key,0)>=3600:
             current=key+"/robots.txt"
             for hop in range(4):

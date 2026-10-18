@@ -22,7 +22,7 @@ URL = 'https://fixture.example/company/'
 
 
 class FixtureFetcher:
-    demo_origin = 'http://127.0.0.1:8080'
+    fixture_origin = 'http://127.0.0.1:8080'
     body = HTML
     def addresses(self, url, source):
         return ['93.184.216.34']

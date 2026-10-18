@@ -6,7 +6,7 @@ from parity import config
 from parity.db import DB,chat_messages
 from parity.embedding import Embedder
 from parity.chat import ChatService,ChatError,GroundedAnswer,AnswerBlock,SearchQuestion,EvidenceSelection
-from run import ensure_ports_available,portal_port,LaunchError,OwnedProcesses
+from run import ensure_ports_available,LaunchError,OwnedProcesses
 
 class EvidenceService:
     def __init__(self,tmp_path):
@@ -91,9 +91,6 @@ def test_launcher_detects_conflict_and_invalid_origins():
         sock.bind(('127.0.0.1',0));sock.listen()
         with pytest.raises(LaunchError,match='occupied'):ensure_ports_available([('test',sock.getsockname()[1])])
     with pytest.raises(LaunchError,match='more than one'):ensure_ports_available([('a',19001),('b',19001)])
-    assert portal_port('http://localhost:8080')==8080
-    for bad in ['https://localhost:8080','http://example.com','http://127.0.0.1/admin']:
-        with pytest.raises(LaunchError):portal_port(bad)
 
 def test_launcher_reports_failed_subprocess_and_cleans_owned_children(tmp_path):
     owned=OwnedProcesses(tmp_path)

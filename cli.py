@@ -5,7 +5,6 @@ from parity.service import Service
 def main():
     p=argparse.ArgumentParser(description="Parity local knowledge monitor")
     sub=p.add_subparsers(dest="command",required=True)
-    sub.add_parser("demo-source")
     a=sub.add_parser("add-source");a.add_argument("name");a.add_argument("url");a.add_argument("--config")
     a=sub.add_parser("crawl");a.add_argument("source_id")
     a=sub.add_parser("search");a.add_argument("query");a.add_argument("--source");a.add_argument("--as-of")
@@ -14,8 +13,7 @@ def main():
     a=sub.add_parser("page");a.add_argument("page_id");a.add_argument("--version",type=int)
     sub.add_parser("status");sub.add_parser("worker")
     args=p.parse_args();s=Service()
-    if args.command=="demo-source":out=s.seed_demo()
-    elif args.command=="add-source":
+    if args.command=="add-source":
         settings=json.loads(open(args.config,encoding="utf-8").read()) if args.config else None
         out=s.add_source(args.name,args.url,settings)
     elif args.command=="crawl":out=s.run(s.enqueue(args.source_id)["id"])

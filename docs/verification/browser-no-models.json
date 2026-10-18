@@ -1,8 +1,9 @@
 {
   "models": "stopped",
   "checks": [
+    "Settings UI, retired sample endpoints and legacy static app are absent",
     "Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps",
-    "Dashboard zero/currency/table/list rendering and default demo isolation with PostgreSQL",
+    "Dashboard zero/currency/table/list rendering and normal source inclusion with PostgreSQL",
     "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
     "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
     "Failed HTTP check retains previous verified value and warning; next successful check recovers",
@@ -12,8 +13,8 @@
     "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation"
   ],
   "screenshots": [
-    "outputs/runtime/browser-9b058433cd2c4136817a26d4313bbbc8/desktop.png",
-    "outputs/runtime/browser-9b058433cd2c4136817a26d4313bbbc8/narrow.png"
+    "outputs/runtime/browser-5b0186fef1d648929201188c0259311c/desktop.png",
+    "outputs/runtime/browser-5b0186fef1d648929201188c0259311c/narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

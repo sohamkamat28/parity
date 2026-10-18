@@ -25,7 +25,7 @@ def preview_capture(service, url, source):
     with service.db.tx() as connection:
         if not Jobs(service)._reserve(connection,resource_locks,'name','chromium',owner,time.time()):
             raise ValueError('Chromium is capturing another page. Wait for that check to finish, then refresh the preview.')
-    try:return capture(url,source,service.fetcher.demo_origin)
+    try:return capture(url,source,getattr(service.fetcher,"fixture_origin",None))
     finally:
         with service.db.tx() as connection:
             connection.execute(resource_locks.update().where(resource_locks.c.name=='chromium',resource_locks.c.owner==owner).values(owner=None,lease_until=0))
@@ -61,8 +61,8 @@ def browser_status():
         return {"status":"missing","executable":None,"error":str(error)}
 
 
-def capture(url,source,demo_origin=None):
-    payload={"url":url,"source":source,"demo_origin":demo_origin,
+def capture(url,source,fixture_origin=None):
+    payload={"url":url,"source":source,"fixture_origin":fixture_origin,
              "seconds":CAPTURE_SECONDS,"max_resources":MAX_RESOURCES,"max_bytes":MAX_CAPTURE_BYTES}
     flags=subprocess.CREATE_NO_WINDOW if sys.platform=="win32" else 0
     proc=subprocess.Popen([sys.executable,"-m","parity.browser_worker"],

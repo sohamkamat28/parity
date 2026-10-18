@@ -50,7 +50,7 @@ def corpus_text(i):
 def ingest(db,model,n):
     now=time.time();docs=(n+9)//10
     with db.tx() as c:
-        c.execute(sources.insert().values(id='benchmark',name='Benchmark corpus',root_url='https://benchmark.invalid/',config={'interval':900,'demo':False,'source_kind':'normal'},enabled=True))
+        c.execute(sources.insert().values(id='benchmark',name='Benchmark corpus',root_url='https://benchmark.invalid/',config={'interval':900,'source_kind':'normal'},enabled=True))
         for start in range(0,docs,500):
             batch=range(start,min(docs,start+500))
             c.execute(pages.insert(),[{'id':f'p{i}','source_id':'benchmark','url':f'https://benchmark.invalid/{i}','title':f'Project Aster{i:05d}','availability':'active','health':'healthy','current_id':f'v{i}','last_version_id':f'v{i}','checked_at':now,'verified_at':now} for i in batch])

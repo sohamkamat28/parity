@@ -239,7 +239,7 @@ class Jobs:
                         c.execute(url_jobs.update().where(url_jobs.c.id==claim['id']).values(metrics=saved))
                     if source['config'].get('render_mode')=='browser':
                         from .browser import capture
-                        response=capture(url,source,self.service.fetcher.demo_origin)
+                        response=capture(url,source,getattr(self.service.fetcher,"fixture_origin",None))
                     else:
                         # Full captures preserve attribute evidence even when text is unchanged.
                         response=self.service.fetcher.get(url,source,{})

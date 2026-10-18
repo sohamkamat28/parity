@@ -13,7 +13,7 @@ from parity.job_schema import run_state,url_jobs,index_jobs,index_state,resource
 
 class FixtureFetcher:
     def __init__(self):
-        self.demo_origin=config.DEMO_ORIGIN
+        self.fixture_origin='https://fixture.example'
         self.responses={};self.calls=[]
     def addresses(self,*args):return ['127.0.0.1']
     def get(self,url,source,headers=None):
@@ -35,8 +35,8 @@ def system(tmp_path,monkeypatch,database_url):
     fetcher=FixtureFetcher();monitor=MonitorStub()
     monkeypatch.setattr(Jobs,'_monitor',lambda self:monitor)
     service=Service(DB(database_url),fetcher=fetcher,inline_index=False)
-    source=service.add_source('Monitor',config.DEMO_ORIGIN+'/docs/one',{
-        'demo':True,'delay':0,'scope_mode':'page','max_depth':0,'max_pages':1})
+    source=service.add_source('Monitor','https://fixture.example'+'/docs/one',{
+        'delay':0,'scope_mode':'page','max_depth':0,'max_pages':1})
     yield service,source,fetcher,monitor
     service.db.engine.dispose()
 

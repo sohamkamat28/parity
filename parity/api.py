@@ -7,10 +7,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from .service import Service
 from .chat import ChatService
-from .operations import DemoService, overview, list_changes, run_observations
+from .operations import overview, list_changes, run_observations
 from . import config
 
-service=Service();chat=ChatService(service);demo=DemoService(service)
+service=Service();chat=ChatService(service)
 stop=threading.Event()
 runtime_state={'embedding':{'status':'loading','mode':config.EMBEDDER,'error':None},'worker':{'status':'starting','error':None}}
 session_cookie=secrets.token_urlsafe(32)
@@ -81,12 +81,6 @@ class ChatIn(BaseModel):
     source_ids:list[str]|None=None
     mode:str='current'
     as_of:float|None=None
-class DemoIn(BaseModel):name:str|None=Field(default=None,max_length=100)
-class ActionIn(BaseModel):
-    crawl:bool=True
-    target:str|None=None
-    status:int|None=None
-
 @app.post('/api/session')
 def connect(body:SessionIn):
     global bootstrap_used
@@ -122,8 +116,6 @@ def add_source(body:SourceIn):return service.add_source(body.name,body.root_url,
 def test_source(body:SourceIn):return service.test_source(body.name,body.root_url,body.settings)
 @app.patch('/api/sources/{source_id}')
 def update_source(source_id:str,body:SourceUpdate):return service.update_source(source_id,**body.model_dump())
-@app.post('/api/demo-source')
-def old_demo():return service.seed_demo()
 @app.post('/api/sources/{source_id}/crawl')
 def crawl(source_id:str):return service.enqueue(source_id)
 @app.get('/api/crawl-runs/{run_id}')
@@ -152,14 +144,6 @@ def chat_test():return chat.test_connection()
 def conversations():return chat.conversations()
 @app.get('/api/chat/conversations/{conversation_id}')
 def conversation(conversation_id:str):return chat.conversation(conversation_id)
-@app.get('/api/demo/sessions')
-def demo_list():return demo.sessions()
-@app.post('/api/demo/sessions')
-def demo_create(body:DemoIn):return demo.create(body.name)
-@app.get('/api/demo/sessions/{session_id}')
-def demo_get(session_id:str):return demo.get(session_id)
-@app.post('/api/demo/sessions/{session_id}/actions/{action}')
-def demo_action(session_id:str,action:str,body:ActionIn):return demo.action(session_id,action,body.crawl,body.model_dump(exclude_none=True))
 @app.post('/api/integrations/mcp/test')
 async def mcp_test():
     from .integrations import test_mcp
@@ -169,6 +153,5 @@ from .v2_api import create_router
 app.include_router(create_router(service,chat))
 bundle=config.ROOT/'frontend'/'dist'
 if (bundle/'assets').is_dir():app.mount('/assets',StaticFiles(directory=bundle/'assets'),name='assets')
-app.mount('/static',StaticFiles(directory=config.ROOT/'static'),name='legacy-static')
 @app.get('/')
-def home():return FileResponse(bundle/'index.html' if (bundle/'index.html').is_file() else config.ROOT/'static'/'index.html')
+def home():return FileResponse(bundle/'index.html')
