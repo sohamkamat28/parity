@@ -382,3 +382,28 @@ def test_demo_sessions_preserve_prior_state_history_and_live_fixture(namespaced_
     assert client.post("/demo/"+first["id"]+"/admin/reset").status_code==401
     assert len(demos.sessions()["sessions"])==2
     service.db.engine.dispose()
+
+@pytest.mark.parametrize('path,target',[('/robots.txt','robots.txt rules'),('/event/price','the website')])
+def test_fetch_timeout_reports_website_boundary(monkeypatch,path,target):
+    fetcher=Fetcher()
+    monkeypatch.setattr(fetcher,'addresses',lambda *args:['93.184.216.34'])
+    def timeout(*args,**kwargs):raise TimeoutError('private socket details')
+    monkeypatch.setattr(socket,'create_connection',timeout)
+    url='https://example.org'+path
+    with pytest.raises(FetchError,match='timed out') as caught:
+        fetcher._request(url,{'root_url':url,'config':{}},{})
+    assert target in str(caught.value) and 'device and network' in str(caught.value)
+    assert 'private socket details' not in str(caught.value)
+
+
+def test_tls_timeout_closes_connected_socket(monkeypatch):
+    from types import SimpleNamespace
+    fetcher=Fetcher();closed=[]
+    monkeypatch.setattr(fetcher,'addresses',lambda *args:['93.184.216.34'])
+    monkeypatch.setattr(socket,'create_connection',lambda *args,**kwargs:SimpleNamespace(close=lambda:closed.append(True)))
+    def timeout(*args,**kwargs):raise TimeoutError('TLS stalled')
+    import ssl
+    monkeypatch.setattr(ssl,'create_default_context',lambda:SimpleNamespace(wrap_socket=timeout))
+    with pytest.raises(FetchError,match='timed out'):
+        fetcher._request('https://example.org',{'root_url':'https://example.org','config':{}},{})
+    assert closed==[True]

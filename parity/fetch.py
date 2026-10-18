@@ -102,6 +102,7 @@ class Fetcher:
         if elapsed<spacing: time.sleep(spacing-elapsed)
         self.last_request[p.netloc]=time.monotonic()
         connection=None
+        sock=None
         try:
             # No second DNS lookup: the validated numeric address is the socket target.
             sock=socket.create_connection((addresses[0],port),timeout=10)
@@ -121,10 +122,15 @@ class Fetcher:
             body=r.read(size+1)
             if len(body)>size: raise FetchError("Response exceeds byte limit")
             return Response(url,r.status,rh,body)
+        except TimeoutError as e:
+            target='the website\'s robots.txt rules' if p.path=='/robots.txt' else 'the website'
+            raise FetchError(f'The request to {target} timed out. Check that this URL opens on this device and network, then retry. '
+                             'The site may be unavailable or restrict automated access; reinstalling AI models will not resolve a network timeout.') from e
         except (OSError,http.client.HTTPException) as e:
             raise FetchError(type(e).__name__ + ": " + str(e)) from e
         finally:
             if connection: connection.close()
+            elif sock: sock.close()
 
     def _robots_for(self,url,source):
         key=origin(url)
