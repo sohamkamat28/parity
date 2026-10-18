@@ -268,11 +268,32 @@ def test_model_warmup_precedes_lease_and_heartbeat_survives_slow_encoding(web_fi
         return real_model()
     monkeypatch.setattr(service,"model",model)
     monkeypatch.setattr(config,"LEASE_SECONDS",.8)
+    # Advance lease time explicitly so Windows runner scheduling cannot consume a
+    # subsecond lease. The actual heartbeat thread must still renew it twice.
+    from types import SimpleNamespace
+    import parity.service as service_module
+    clock=[time.time()];renewals=[]
+    monkeypatch.setattr(service_module,'time',SimpleNamespace(time=lambda:clock[0],sleep=time.sleep))
     encode=service.embedder.encode
-    def slow_encode(text):time.sleep(1.3);return encode(text)
+    def wait_for_renewal(previous):
+        deadline=time.monotonic()+10
+        while time.monotonic()<deadline:
+            lease=service.source(source['id'])['lease_until']
+            if lease>previous:return lease
+            time.sleep(.02)
+        raise AssertionError('Heartbeat did not renew the held lease')
+    def slow_encode(text):
+        original=service.source(source['id'])['lease_until']
+        clock[0]+=.3
+        renewed=wait_for_renewal(original)
+        clock[0]=original+.1
+        assert clock[0]<renewed
+        renewed_again=wait_for_renewal(renewed)
+        renewals.append(renewed_again)
+        return encode(text)
     monkeypatch.setattr(service.embedder,"encode",slow_encode)
     result=service.run(job["id"])
-    assert observed==[(0,None)]
+    assert observed==[(0,None)] and renewals
     assert result["status"]=="succeeded",result
     assert service.source(source["id"])["lease_until"]==0
 
