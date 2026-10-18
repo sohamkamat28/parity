@@ -275,7 +275,9 @@ def discover(body, url):
         if property_rows and all(len(cells) == 2 and cells[0].name == 'th' and cells[1].name == 'td' for cells in property_rows):
             # Product/specification tables have labels, not reporting-period headers.
             for label, value in property_rows[:40]:
-                add(label.get_text(' ', strip=True), infer_type(value.get_text(' ', strip=True)), {'kind': 'scalar', 'selector': css_path(value)})
+                name = clean(label.get_text(' ', strip=True))
+                add(name, infer_type(value.get_text(' ', strip=True)), {'kind': 'label_value', 'selector': css_path(table)+' tr',
+                    'label': name, 'value_selector': ':scope > td'})
             continue
         heading = table.find_previous(['h1', 'h2', 'h3', 'h4'])
         title = clean(heading.get_text(' ', strip=True)) if heading else 'Table'

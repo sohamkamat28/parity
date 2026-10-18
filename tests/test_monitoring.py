@@ -258,6 +258,14 @@ def test_automatic_selection_omits_boilerplate_matching_generic_words():
     assert len(fields)==3
 
 
+def test_discovered_product_properties_follow_labels_after_reordering():
+    price='<tr><th>Price</th><td>£12</td></tr>'
+    stock='<tr><th>Stock</th><td>100</td></tr>'
+    field=suggest(discover('<table>'+price+stock+'</table>',URL),'Track price')[0]
+    assert extract_field('<table>'+stock+price+'</table>',field,URL)['value']=='12'
+    with pytest.raises(LookupError):extract_field('<table>'+stock+'</table>',field,URL)
+
+
 def test_automatic_price_does_not_activate_a_heading(monitor,monkeypatch):
     from parity import browser
     m,fetcher=monitor;fetcher.body='<h1>Current price</h1>'
