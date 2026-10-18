@@ -3,16 +3,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env", override=False)
+def installation_path(value):
+    path = Path(value).expanduser()
+    return (path if path.is_absolute() else ROOT / path).resolve()
 # Keep downloaded runtime assets with this installation, outside release archives.
-CACHE = Path(os.getenv("PARITY_CACHE_DIR", ROOT / ".cache")).resolve()
+CACHE = installation_path(os.getenv("PARITY_CACHE_DIR", ROOT / ".cache"))
 os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(CACHE / "ms-playwright"))
 os.environ.setdefault("PARITY_MODEL_CACHE", str(CACHE / "models"))
 os.environ.setdefault("HF_HOME", str(CACHE / "huggingface"))
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
-DATA = Path(os.getenv("PARITY_DATA_DIR", ROOT / "data")).resolve()
+DATA = installation_path(os.getenv("PARITY_DATA_DIR", ROOT / "data"))
 DATA.mkdir(parents=True, exist_ok=True)
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///" + str(DATA / "parity.db"))
+from urllib.parse import quote
+PROFILE = os.getenv('PARITY_PROFILE', 'postgresql')
+DATABASE_URL = os.getenv("DATABASE_URL") or ('sqlite:///'+str(DATA/'parity.db') if PROFILE == 'sqlite' else
+    'postgresql+psycopg://parity:'+quote(os.getenv('PARITY_DB_PASSWORD',''),safe='')+'@127.0.0.1:'+os.getenv('PARITY_DB_PORT','5432')+'/parity')
 DEMO_ORIGIN = os.getenv("DEMO_ORIGIN", "http://127.0.0.1:8080").rstrip("/")
 EMBEDDER = os.getenv("PARITY_EMBEDDER", "minilm")
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"

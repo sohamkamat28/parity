@@ -172,6 +172,9 @@ class Jobs:
             while not stopped.wait(max(.1,min(10,config.LEASE_SECONDS/3))):
                 try:self.renew(claim,index=index)
                 except Exception:return
+                try:
+                    self.status('index' if index else 'capture','working')
+                except Exception:pass
         thread=threading.Thread(target=beat,daemon=True);thread.start()
         try:yield
         finally:stopped.set();thread.join(timeout=2)
@@ -341,6 +344,8 @@ class Jobs:
             c.execute(runs.update().where(runs.c.id==run_id).values(status=status,finished_at=now,metrics=metrics,
                 error='The page limit was reached' if metrics['budget_exhausted'] else None))
             c.execute(sources.update().where(sources.c.id==source['id']).values(lease_run=None,lease_until=0,next_due=now+source['config']['interval']))
+            from .monitor_schema import monitor_events
+            c.execute(monitor_events.insert().values(source_id=source['id'],kind='check_completed',at=now,detail={'run_id':run_id,'status':status}))
 
     def drain(self,run_id):
         self.initialize(run_id)
@@ -364,7 +369,9 @@ class Jobs:
 
     def index_once(self):
         claim=self.claim_index()
-        if not claim:return None
+        if not claim:
+            self.status('index','ready')
+            return None
         error=None;result=None
         self.service._job_context.index_claim=claim
         try:

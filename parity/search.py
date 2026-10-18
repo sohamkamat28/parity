@@ -163,5 +163,6 @@ def search(service,query,source_ids=None,limit=5,mode="current",as_of=None,inclu
             score_type="RRF" if model.mode=="minilm" else "lexical_rank",last_verified_at=verified,
             freshness_status="historical" if mode=="as_of" else ("source_unavailable" if row["health"]!="healthy" else ("stale" if stale else "within_interval")),
             is_demo=row["config"].get("demo",False),warnings=warnings)
+    pending=pending_count(service,source_ids)
     return {"query":query,"mode":mode,"as_of":as_of,"embedding_mode":model.mode,"results":results,
-            "index_pending":pending_count(service,source_ids),"message":"" if results else "No sufficiently relevant evidence found. This does not prove the source has no update."}
+            "index_pending":pending,"message":"Search index updating" if pending else ("" if results else "No sufficiently relevant evidence found. This does not prove the source has no update.")}

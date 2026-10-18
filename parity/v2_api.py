@@ -13,7 +13,7 @@ def service_status(service):
     result={}
     for key,roles in [('monitoring',('capture','scheduler')),('indexing',('index',))]:
         relevant=[w for w in workers if w['role'] in roles]
-        ready=all(any(w['role']==r and w['status']=='ready' for w in relevant) for r in roles)
+        ready=all(any(w['role']==r and w['status'] in ('ready','working') for w in relevant) for r in roles)
         result[key]={'status':'ready' if ready else ('degraded' if relevant else 'stopped'),'workers':relevant,
             'error':next((w['detail'] for w in relevant if w['status']=='error'),None)}
     result['worker']=result['monitoring']
@@ -44,12 +44,20 @@ def paginate(db,stmt,sort,idcol,limit,cursor):
     for row in rows:row.pop('_cursor_at',None);row.pop('_cursor_id',None)
     return {'items':rows,'next_cursor':next_cursor,'total':total}
 
+def event_batch(db, cursor):
+    bounds=db.one(select(func.min(monitor_events.c.id).label('first'),func.max(monitor_events.c.id).label('last')))
+    latest=bounds['last'] or 0
+    if cursor>latest or (cursor and bounds['first'] and cursor<bounds['first']-1):
+        return latest, None
+    rows=db.all(select(monitor_events).where(monitor_events.c.id>cursor).order_by(monitor_events.c.id).limit(201))
+    return (latest,None) if len(rows)>200 else (cursor,rows)
+
 def create_router(service,chat):
     from .monitoring import MonitorService
     monitor=MonitorService(service);router=APIRouter()
 
     @router.get('/api/list/{kind}')
-    def listing(kind:str,source_id:str|None=None,cursor:str|None=None,limit:int=Query(50,ge=1,le=200),include_demo:bool=False,status:str|None=None,q:str|None=None):
+    def listing(kind:str,source_id:str|None=None,cursor:str|None=None,limit:int=Query(50,ge=1,le=200),include_demo:bool=False,status:str|None=None,q:str|None=None,kind_filter:str|None=Query(None,alias='kind')):
         if kind=='sources':
             table=sources;sort=sources.c.created_at;idcol=sources.c.id
             docs=select(func.count()).select_from(pages).where(pages.c.source_id==sources.c.id).correlate(sources).scalar_subquery()
@@ -77,6 +85,7 @@ def create_router(service,chat):
             stmt=stmt.where(or_(sources.c.name.ilike('%'+needle+'%',escape='\\'),sources.c.root_url.ilike('%'+needle+'%',escape='\\')))
         if not include_demo:stmt=_normal(stmt)
         if status and 'status' in table.c:stmt=stmt.where(table.c.status==status)
+        if kind_filter and 'kind' in table.c:stmt=stmt.where(table.c.kind==kind_filter)
         stmt=stmt.add_columns(sort.label('_cursor_at'),idcol.label('_cursor_id'))
         result=paginate(service.db,stmt,sort,idcol,limit,cursor)
         if kind=='sources':
@@ -88,7 +97,10 @@ def create_router(service,chat):
     @router.post('/api/monitors')
     def activate(body:dict):return monitor.activate(body)
     @router.get('/api/monitors')
-    def monitors_list(source_id:str|None=None):return monitor.list_monitors(source_id)
+    def monitors_list(source_id:str|None=None,limit:int=Query(50,ge=1,le=200),cursor:str|None=None):return monitor.list_monitors(source_id,limit,cursor)
+    @router.get('/api/monitor-changes')
+    def tracked_changes(source_id:str|None=None,monitor_id:str|None=None,limit:int=Query(50,ge=1,le=200),cursor:str|None=None,include_demo:bool=False,kind:str|None=None,q:str|None=None):
+        return monitor.changes(source_id,monitor_id,limit,cursor,include_demo,kind,q)
     @router.patch('/api/monitors/{monitor_id}')
     def revise(monitor_id:str,body:dict):
         if set(body)=={'paused'}:
@@ -121,10 +133,9 @@ def create_router(service,chat):
             nonlocal cursor
             ticks=0
             while not await request.is_disconnected():
-                rows=await asyncio.to_thread(service.db.all,select(monitor_events).where(monitor_events.c.id>cursor).order_by(monitor_events.c.id).limit(201))
-                if len(rows)>200:
-                    latest=await asyncio.to_thread(service.db.one,select(func.max(monitor_events.c.id).label('id')))
-                    cursor=latest['id'] or cursor
+                watermark,rows=await asyncio.to_thread(event_batch,service.db,cursor)
+                if rows is None:
+                    cursor=watermark
                     yield f'id: {cursor}\nevent: reset\ndata: {{"reason":"refresh_snapshot"}}\n\n'
                 else:
                     for row in rows:

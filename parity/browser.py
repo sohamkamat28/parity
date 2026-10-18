@@ -34,6 +34,8 @@ def browser_status():
         candidates=[folder/"chrome-win64"/"chrome.exe",folder/"chrome-win"/"chrome.exe",
                     folder/"chrome-linux64"/"chrome",folder/"chrome-linux"/"chrome",
                     folder/"chrome-mac"/"Chromium.app"/"Contents"/"MacOS"/"Chromium"]
+        candidates += [folder/"chrome-mac-arm64"/"Google Chrome for Testing.app"/"Contents"/"MacOS"/"Google Chrome for Testing",
+                       folder/"chrome-mac-x64"/"Google Chrome for Testing.app"/"Contents"/"MacOS"/"Google Chrome for Testing"]
         executable=next((p for p in candidates if p.is_file()),None)
         if executable is None:
             raise ValueError("Matching Chromium is missing. Run python -m playwright install chromium.")

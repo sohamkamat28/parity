@@ -26,20 +26,21 @@ class FixtureFetcher:
     body = HTML
     def addresses(self, url, source):
         return ['93.184.216.34']
-    def get(self, url, source, **kwargs):
+    def get(self, url, source, headers=None, **kwargs):
         return Response(url, 200, {'content-type': 'text/html'}, self.body.encode())
 
 
 @pytest.fixture
-def monitor(tmp_path, monkeypatch):
+def monitor(tmp_path, monkeypatch, database_url):
     monkeypatch.setattr(config, 'DATA', tmp_path)
     monkeypatch.delenv('PARITY_LOCAL_CHAT_TOKEN', raising=False)
     fetcher = FixtureFetcher()
-    service = Service(DB('sqlite:///'+str(tmp_path/'monitor.db')), fetcher=fetcher)
+    service = Service(DB(database_url), fetcher=fetcher)
     def unavailable():
         raise AssertionError('Monitoring must not load an embedding model')
     monkeypatch.setattr(service, 'model', unavailable)
-    return MonitorService(service), fetcher
+    yield MonitorService(service), fetcher
+    service.db.engine.dispose()
 
 
 def setup_monitor(monitor, names=('Current Price', 'Promoter holding')):

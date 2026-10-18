@@ -53,7 +53,15 @@ class ChatService:
 
     def status(self):
         configured=bool(os.getenv('OPENAI_API_KEY','').strip()) or self._client is not None
-        if self.provider=='local':configured=(config.CACHE/'local-chat'/(config.LOCAL_CHAT_MODEL+'.gguf')).is_file()
+        if self.provider=='local':
+            import httpx
+            installed=(config.CACHE/'local-chat'/(config.LOCAL_CHAT_MODEL+'.gguf')).is_file()
+            try:
+                with httpx.Client(trust_env=False,timeout=.5) as client:
+                    ready=client.get(f'http://127.0.0.1:{config.LOCAL_CHAT_PORT}/health').status_code==200
+            except httpx.HTTPError:ready=False
+            return {'status':'ready' if ready else ('stopped' if installed else 'not_configured'),
+                    'model':self.model,'provider':self.provider,'error':None if ready else 'The local answer service is stopped. Start Parity with models enabled; monitoring continues.', 'tested_at':self._tested}
         return {'status':'connected' if self._tested else ('error' if self._error else ('configured' if configured else 'not_configured')),
                 'model':self.model,'provider':self.provider,'error':self._error,'tested_at':self._tested}
 
@@ -161,7 +169,7 @@ class ChatService:
             else:
                 supplied=[];mapping={}
                 for index,item in enumerate(evidence,1):
-                    citation={key:item.get(key) for key in ('chunk_id','page_id','version_id','number','url','title','text','locator','last_verified_at','warnings','evidence_type','capture_id','snapshot_id','monitor_id','field_id','period','unit','value')}
+                    citation={key:item.get(key) for key in ('chunk_id','page_id','version_id','number','url','title','text','locator','last_verified_at','warnings','evidence_type','capture_id','snapshot_id','monitor_id','field_id','period','unit','value','supporting_captures')}
                     citation['id']=index;mapping[index]=citation
                     supplied.append({'id':index,'title':item['title'],'version':item['number'],'passage':item['text'],'locator':item['locator'],'warnings':item.get('warnings',[])})
                 if self.provider=='local':

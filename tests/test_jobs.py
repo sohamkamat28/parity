@@ -30,14 +30,15 @@ class MonitorStub:
 
 
 @pytest.fixture
-def system(tmp_path,monkeypatch):
+def system(tmp_path,monkeypatch,database_url):
     monkeypatch.setattr(config,'DATA',tmp_path)
     fetcher=FixtureFetcher();monitor=MonitorStub()
     monkeypatch.setattr(Jobs,'_monitor',lambda self:monitor)
-    service=Service(DB('sqlite:///'+str(tmp_path/'jobs.db')),fetcher=fetcher,inline_index=False)
+    service=Service(DB(database_url),fetcher=fetcher,inline_index=False)
     source=service.add_source('Monitor',config.DEMO_ORIGIN+'/docs/one',{
         'demo':True,'delay':0,'scope_mode':'page','max_depth':0,'max_pages':1})
-    return service,source,fetcher,monitor
+    yield service,source,fetcher,monitor
+    service.db.engine.dispose()
 
 
 def test_capture_is_model_independent_and_indexes_later(system,monkeypatch):

@@ -209,11 +209,14 @@ def main(argv=None):
             print('Browser rendering unavailable. Run setup.bat to install matching Chromium. Static monitoring remains available.',flush=True)
         local_command = None
         if provider == "local" and not args.without_models:
-            runtime = config.CACHE / "local-chat" / "runtime" / "llama-server.exe"
+            import shutil
+            bundled = config.CACHE / 'local-chat' / 'runtime'
+            runtime = next(bundled.rglob('llama-server.exe' if os.name=='nt' else 'llama-server'), None) if bundled.exists() else None
+            executable = os.getenv('PARITY_LLAMA_SERVER') or (str(runtime) if runtime else shutil.which('llama-server'))
             model = config.CACHE / "local-chat" / (config.LOCAL_CHAT_MODEL + ".gguf")
-            if not runtime.is_file() or not model.is_file():
+            if not executable or not model.is_file():
                 print('Local chat unavailable: run setup.bat to install its model. Monitoring continues.',flush=True)
-            else:local_command = [str(runtime), "--model", str(model), "--host", "127.0.0.1",
+            else:local_command = [executable, "--model", str(model), "--host", "127.0.0.1",
                 "--port", str(config.LOCAL_CHAT_PORT), "--ctx-size", "4096",
                 "--threads", "4", "--parallel", "1", "--n-gpu-layers", "0",
                 "--alias", config.LOCAL_CHAT_MODEL]

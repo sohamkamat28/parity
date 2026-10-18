@@ -53,7 +53,7 @@ def mutate(action,payload=None):
         elif action=="clear-faults":state["faults"]={}
         elif action=="fault":
             target=(payload or {}).get("target");status=(payload or {}).get("status")
-            if target not in ("honours-registration","exam-timetable","scholarship-notice"):
+            if target not in ("honours-registration","exam-timetable","scholarship-notice","metrics"):
                 raise ValueError("Unknown fixture")
             if status not in (0,403,404,429,503):raise ValueError("Unsupported fault status")
             state["faults"][target]=status
@@ -120,6 +120,24 @@ def sitemap(request:Request):
     raw=('<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+
          "".join("<url><loc>"+u+"</loc></url>" for u in urls)+"</urlset>").encode()
     return Response(raw,media_type="application/xml")
+
+@app.get('/en/metrics')
+def structured_fixture(request:Request):
+    state=read_state();fault=state['faults'].get('metrics',0)
+    if fault:return Response('Injected demonstration fault',status_code=fault,headers={'Retry-After':'0'})
+    revised=state['noc']
+    price='1,250' if revised else '1,200.50'
+    revenue='1,400' if revised else '1,200'
+    news='<li><a href="/en/circulars/honours-registration">Registration notice</a></li>'
+    if state['added']:news+='<li><a href="/en/circulars/reassessment-supplementary">New reassessment notice</a></li>'
+    body=f'''<article><h1>Structured monitoring test page</h1><p>Synthetic values for testing; these are not real company results.</p>
+    <ul id="metrics"><li><span class="name">Current Price</span> <span class="value">Rs. {price}</span></li>
+    <li><span class="name">Promoter holding</span> <span class="value">0%</span></li></ul>
+    <h2>Quarterly results</h2><table id="quarterly"><caption>Figures in Rs. Crores</caption>
+    <tr><th>Metric</th><th>Mar 2026</th><th>Jun 2026</th></tr>
+    <tr><td>Revenue</td><td>1,000</td><td>{revenue}</td></tr></table>
+    <h2>Announcements</h2><ul id="news">{news}</ul></article>'''
+    return response(request,'Structured monitoring test page',body,state)
 
 @app.get("/en/circulars/{slug}")
 def notice(slug:str,request:Request):

@@ -22,7 +22,10 @@ class Service:
 
     def model(self):
         with self._embed_lock:
-            if self.embedder is None: self.embedder=Embedder()
+            if self.embedder is None:
+                try:self.embedder=Embedder()
+                except Exception as error:
+                    raise ValueError('Semantic search is unavailable. Install the cached MiniLM model and start the embedding service. Monitoring continues.') from error
         return self.embedder
 
     def _prepare_source(self,name,root_url,settings=None):
@@ -288,7 +291,13 @@ class Service:
 
     def _observe(self,run_id,url,status,outcome,detail=""):
         with self.db.tx() as c:
-            c.execute(observations.insert().values(id=uid(),run_id=run_id,url=url,at=time.time(),
+            claim=getattr(self._job_context,'claim',None)
+            if claim:
+                self._guard(c,claim['source_id'],run_id,claim['source_generation'])
+                observation_id=hashlib.sha256((run_id+'\0'+url).encode()).hexdigest()[:32]
+                if c.execute(select(observations.c.id).where(observations.c.id==observation_id)).first():return
+            else:observation_id=uid()
+            c.execute(observations.insert().values(id=observation_id,run_id=run_id,url=url,at=time.time(),
                 status=status,outcome=outcome,detail=detail[:1000]))
 
     def _close(self,c,page_id,at):
@@ -402,6 +411,8 @@ class Service:
                 inserted=c.execute(insert(cache).values(**entry).on_conflict_do_nothing(index_elements=['key']))
                 new_count+=max(inserted.rowcount,0)
                 found[key]=dict(c.execute(select(cache).where(cache.c.key==key)).mappings().one())
+            from .search_schema import projection
+            c.execute(projection.delete().where(projection.c.version_id==version_id))
             c.execute(chunks.delete().where(chunks.c.version_id==version_id))
             if items:
                 c.execute(chunks.insert(),[{'id':uid(),'version_id':version_id,'ordinal':i,
@@ -416,6 +427,8 @@ class Service:
                 'new_vectors':new_count,'reused_vectors':len(items)-new_count,'chunks':len(items),'index_status':'ready'}))
             from .search import project_version
             project_version(self,version_id,connection=c)
+            from .monitor_schema import monitor_events
+            c.execute(monitor_events.insert().values(kind='index_updated',at=now,detail={'version_id':version_id}))
         return {'version_id':version_id,'new_vectors':new_count,'reused_vectors':len(items)-new_count,'chunks':len(items)}
 
     def _publish_inline(self,source,run_id,generation,url,page,response,doc,metrics):
@@ -477,6 +490,8 @@ class Service:
             c.execute(events.insert().values(id=uid(),page_id=page_id,run_id=run_id,kind=kind,
                 old_version_id=old["id"] if old else None,new_version_id=version_id,at=now,
                 detail={"new_vectors":new_vectors,"reused_vectors":reused,"chunks":len(items)}))
+            from .search import project_version
+            project_version(self,version_id,connection=c)
         metrics[kind.lower() if kind!="PIPELINE_REPROCESSED" else "modified"]+=1
         metrics["new_vectors"]+=new_vectors;metrics["reused_vectors"]+=reused
         self._observe(run_id,url,200,kind)

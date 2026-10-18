@@ -1,8 +1,10 @@
 """Download a pinned, CPU-only local model runtime. No account or API key needed."""
-import hashlib, sys, urllib.request, zipfile, zlib
+import hashlib, sys, urllib.request, zipfile, zlib, tarfile, platform
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-CACHE=ROOT/'.cache'/'local-chat'
+sys.path.insert(0,str(ROOT))
+from parity import config
+CACHE=config.CACHE/'local-chat'
 RUNTIME_URL='https://github.com/ggml-org/llama.cpp/releases/download/b11642/llama-b11642-bin-win-cpu-x64.zip'
 RUNTIME_SHA='0145f328421169f96b79a42ee27df8403df2276f1d94c7a82fea61901acec38f'
 MODEL_URL='https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf'
@@ -30,17 +32,24 @@ def download(url,path,expected):
     temporary.replace(path)
 
 def main():
-    if sys.platform!='win32':raise SystemExit('Bundled local chat setup currently targets Windows x64.')
+    mac = sys.platform=='darwin' and platform.machine()=='arm64'
+    if sys.platform!='win32' and not mac:raise SystemExit('Use a native llama-server on PATH or PARITY_LLAMA_SERVER, and place the verified GGUF in PARITY_CACHE_DIR/local-chat. Bundled runtime downloads support Windows x64 and macOS arm64.')
     CACHE.mkdir(parents=True,exist_ok=True)
-    archive=CACHE/'runtime.zip';download(RUNTIME_URL,archive,RUNTIME_SHA)
+    archive=CACHE/('runtime.tar.gz' if mac else 'runtime.zip')
+    url='https://github.com/ggml-org/llama.cpp/releases/download/b11642/llama-b11642-bin-macos-arm64.tar.gz' if mac else RUNTIME_URL
+    sha='9b08d85971cafd4fc41f3a07727e7a7ebf05c25c423ad556be300bcb7cf0df1d' if mac else RUNTIME_SHA
+    download(url,archive,sha)
     runtime=CACHE/'runtime';runtime.mkdir(exist_ok=True)
-    with zipfile.ZipFile(archive) as zipped:
-        for info in zipped.infolist():
-            destination=(runtime/info.filename).resolve()
-            if not destination.is_relative_to(runtime.resolve()):raise RuntimeError('Unsafe runtime archive path')
-            if destination.is_file() and destination.stat().st_size==info.file_size:
-                if zlib.crc32(destination.read_bytes())==info.CRC:continue
-            zipped.extract(info,runtime)
+    if mac:
+        with tarfile.open(archive) as packaged:packaged.extractall(runtime,filter='data')
+    else:
+        with zipfile.ZipFile(archive) as zipped:
+            for info in zipped.infolist():
+                destination=(runtime/info.filename).resolve()
+                if not destination.is_relative_to(runtime.resolve()):raise RuntimeError('Unsafe runtime archive path')
+                if destination.is_file() and destination.stat().st_size==info.file_size:
+                    if zlib.crc32(destination.read_bytes())==info.CRC:continue
+                zipped.extract(info,runtime)
     download(MODEL_URL,CACHE/'qwen2.5-1.5b-instruct-q4_k_m.gguf',MODEL_SHA)
     print('Free local chat is installed and checksums are verified.',flush=True)
 

@@ -13,7 +13,7 @@ MAX_FIELDS = 40
 
 
 def clean(value):
-    return re.sub(r'\s+', ' ', str(value or '')).strip()
+    return re.sub(r'\s+', ' ', '' if value is None else str(value)).strip()
 
 
 def fingerprint(value):
@@ -49,16 +49,19 @@ def safe_url(base, href):
 def unit_from(text, percentages=True):
     currency = 'INR' if re.search(r'₹|\b(?:Rs\.?|INR)\b', text, re.I) else ('USD' if '$' in text or re.search(r'\bUSD\b', text) else ('EUR' if '€' in text else ('GBP' if '£' in text else '')))
     scale = next((label for pattern, label in [(r'\b(?:crores?|cr)\.?\b', 'crore'), (r'\b(?:lakhs?|lac)\b', 'lakh'), (r'\bbillion\b', 'billion'), (r'\bmillion\b', 'million'), (r'\bthousand\b', 'thousand')] if re.search(pattern, text, re.I)), '')
-    return '%' if percentages and '%' in text else ' '.join(x for x in (currency, scale) if x)
+    physical = re.search(r'\b(?:kg|mg|g|km|cm|mm|m|MW|kW|W|kWh|MWh|GB|MB|litres?|liters?|tonnes?)\b', text)
+    return '%' if percentages and '%' in text else (' '.join(x for x in (currency, scale) if x) or (physical.group() if physical else ''))
 
 
 def infer_type(raw):
     text = clean(raw)
+    if re.fullmatch(r'\d{4}-\d{2}-\d{2}', text) or re.fullmatch(r'\d{1,2}\s+[A-Za-z]+\s+\d{4}', text):
+        return 'date'
     if re.fullmatch(r'[-+()\d,.\s]+\s*%', text):
         return 'percentage'
     if re.search(r'₹|\$|€|£|\b(?:Rs\.?|INR|USD)\b', text, re.I) and re.search(r'\d', text):
         return 'currency'
-    if re.fullmatch(r'[-+()\d,.\s]+(?:\s*(?:Cr\.?|crore|lakh|million|billion))?', text, re.I) and re.search(r'\d', text):
+    if re.fullmatch(r'[-+]?\(?[\d,.\s]+\)?(?:\s*(?:Cr\.?|crore|lakh|million|billion|kg|MW|kW|km))?', text, re.I) and re.search(r'\d', text):
         return 'number'
     if re.fullmatch(r'\d{4}-\d{2}-\d{2}', text) or re.fullmatch(r'\d{1,2}\s+[A-Za-z]+\s+\d{4}', text):
         return 'date'
@@ -85,6 +88,9 @@ def normalize(raw, kind, unit='', date_format=None):
     numeric = re.sub(r'\bRs\.?', '', raw, flags=re.I)
     numeric = re.sub(r'₹|\$|€|£|%|\b(?:INR|USD|EUR|GBP|crores?|cr|lakhs?|lac|million|billion|thousand)\b\.?', '', numeric, flags=re.I).strip()
     numeric = numeric.replace(',', '').replace('\u2212', '-')
+    for suffix in (detected, unit):
+        if suffix and suffix != '%':
+            numeric = re.sub(r'\s*'+re.escape(suffix)+r'\s*$', '', numeric).strip()
     if numeric.startswith('(') and numeric.endswith(')'):
         numeric = '-' + numeric[1:-1]
     if not re.fullmatch(r'[-+]?\d+(?:\.\d+)?', numeric):
@@ -113,6 +119,8 @@ def table_data(table):
         raise ValueError('The selected table contains no rows.')
     header_index = next((i for i, (_, has_th) in enumerate(matrix) if has_th), 0)
     headers = matrix[header_index][0]
+    if len(set(headers)) != len(headers):
+        raise ValueError('Table headers must be unique. Review the table mapping.')
     if len(headers) > 100:
         raise ValueError('This table exceeds the 100-column monitoring limit.')
     caption = table.find('caption')
@@ -127,6 +135,8 @@ def table_data(table):
         if len(values) != len(headers):
             raise ValueError('Table columns changed or use merged cells. Review the table mapping.')
         label = values[0]
+        if not label or label in seen:
+            raise ValueError('Table row labels must be nonempty and unique. Review the table mapping.')
         seen[label] = seen.get(label, 0)+1
         key = label if seen[label] == 1 else f'{label} ({seen[label]})'
         cells = []
@@ -169,6 +179,8 @@ def extract_field(body, field, url):
     kind = field.get('type', 'text')
     if kind not in TYPES:
         raise ValueError('Unsupported field type.')
+    if (kind == 'table') != (rule['kind'] == 'table') or (kind == 'list') != (rule['kind'] == 'list'):
+        raise ValueError('Table and repeating-list fields require their matching extraction rule.')
     soup = body if isinstance(body, BeautifulSoup) else soup_for(body)
     matches = soup.select(rule['selector'])
     if rule['kind'] == 'label_value':
@@ -193,7 +205,10 @@ def extract_field(body, field, url):
             if rule.get('period_mode') == 'latest':
                 if not row['cells']:
                     raise LookupError('This table has no reporting periods.')
-                period = row['cells'][-1]['period']
+                position = rule.get('latest_position', 'last')
+                if position not in ('first', 'last'):
+                    raise ValueError('Choose whether the newest reporting period is the first or last column.')
+                period = row['cells'][0 if position == 'first' else -1]['period']
             cell = next((cell for cell in row['cells'] if cell['period'] == period), None)
             if cell is None:
                 raise LookupError(f'The {period} reporting period could not be found.')
@@ -233,7 +248,9 @@ def extract_field(body, field, url):
         value, unit = normalize(raw, kind, unit, rule.get('date_format'))
     canonical_value = value
     if isinstance(value, dict) and 'rows' in value:
-        canonical_value = {**value, 'headers': sorted(value['headers']), 'rows': sorted([{**row, 'cells': sorted(row['cells'], key=lambda cell: cell['period'])} for row in value['rows']], key=lambda row: row['key'])}
+        canonical_value = sorted([{'key': row['key'], 'cells': sorted([
+            {key: cell[key] for key in ('period', 'value', 'unit')} for cell in row['cells']
+        ], key=lambda cell: cell['period'])} for row in value['rows']], key=lambda row: row['key'])
     return {'value': value, 'raw_text': raw, 'unit': unit, 'period': period, 'locator': locator,
             'fingerprint': fingerprint({'type': kind, 'value': canonical_value, 'unit': unit, 'period': period})}
 

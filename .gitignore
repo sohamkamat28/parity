@@ -23,4 +23,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.tsbuildinfo
+.DS_Store
+outputs/*.zip
+outputs/runtime/
 # Compiled frontend is intentionally tracked

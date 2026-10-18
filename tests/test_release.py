@@ -111,7 +111,8 @@ def test_browser_json_changes_with_constant_html_and_immutable_artifacts(web_fix
     assert not any(state["conditional"]),"Rendered pages must not use the HTML shell's ETag shortcut"
     assert ("GET","/assets/live.js") in state["requests"]
     assert ("GET","/api/grant") in state["requests"]
-    assert "25 November" in service.search("grant application deadline")["results"][0]["text"]
+    assert service.search("grant application deadline")["results"] == []
+    assert "25 November" in service.search("grant application deadline",source_ids=[source['id']])["results"][0]["text"]
 
 
 def test_browser_resource_failure_retains_verified_version(web_fixture):
@@ -292,7 +293,8 @@ def test_model_initialization_failure_finishes_job_without_claiming(web_fixture,
 def test_v1_database_migration_preserves_history_and_is_idempotent(tmp_path):
     target=tmp_path/"original-v1.db";url="sqlite:///"+str(target)
     old=create_engine(url)
-    excluded={"chat_conversations","chat_messages","demo_sessions"}
+    from parity.db import _V2_TABLES, _V3_TABLES, SCHEMA_VERSION
+    excluded={table.name for table in (*_V2_TABLES, *_V3_TABLES)}
     meta.create_all(old,tables=[table for table in meta.sorted_tables if table.name not in excluded])
     with old.begin() as connection:
         connection.execute(schema.insert().values(number=1))
@@ -301,7 +303,7 @@ def test_v1_database_migration_preserves_history_and_is_idempotent(tmp_path):
         connection.execute(versions.insert().values(id="existing-version",page_id="existing-page",number=1,title="Existing rule",content="Original retained evidence",hash="old-hash"))
     old.dispose()
     upgraded=DB(url)
-    assert upgraded.one(select(schema))["number"]==2
+    assert upgraded.one(select(schema))["number"]==SCHEMA_VERSION
     assert upgraded.one(select(versions))["content"]=="Original retained evidence"
     assert upgraded.one(select(pages))["current_id"]=="existing-version"
     assert excluded.issubset(set(inspect(upgraded.engine).get_table_names()))

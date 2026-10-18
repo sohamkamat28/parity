@@ -115,7 +115,7 @@ class MonitorService:
             source_id = payload.get('source_id')
             current = self.service.source(source_id) if source_id else None
             root = payload.get('root_url') or (current['root_url'] if current else '')
-            settings = dict(current['config']) if current else {'max_pages': 1, 'max_depth': 0, 'interval': 900, 'allow': [urlsplit(root).path or '/']}
+            settings = dict(current['config']) if current else {'max_pages': 1, 'max_depth': 0, 'interval': 900, 'scope_mode': 'page', 'allow': [urlsplit(root).path or '/']}
             settings.update(payload.get('settings') or {})
             source = self.service._prepare_source(payload.get('name') or (current['name'] if current else urlsplit(root).hostname or 'Website'), root, settings)
             if source_id:
@@ -373,12 +373,21 @@ class MonitorService:
     def dashboard(self, source_id=None, include_demo=False, limit=50, cursor=None):
         from .db import sources
         limit = min(100, max(1, int(limit)))
-        query = select(schema.monitors, sources.c.name.label('source_name'), sources.c.config.label('source_config'), sources.c.next_due, sources.c.paused.label('source_paused'), sources.c.enabled.label('source_enabled')).join(sources, sources.c.id == schema.monitors.c.source_id)
+        query = select(schema.monitors, sources.c.name.label('source_name'), sources.c.config.label('source_config'), sources.c.next_due, sources.c.paused.label('source_paused'), sources.c.enabled.label('source_enabled'), sources.c.root_url.label('source_root_url'), sources.c.created_at.label('source_created_at')).join(sources, sources.c.id == schema.monitors.c.source_id)
         if source_id:
             query = query.where(schema.monitors.c.source_id == source_id)
         if not include_demo:
-            query = query.where(sources.c.config['demo'].as_boolean().is_not(True))
+            query = query.where(sources.c.config['demo'].as_boolean().is_not(True), func.coalesce(sources.c.config['source_kind'].as_string(), 'normal') == 'normal')
+        # Save the event watermark before reading the snapshot. A concurrent commit
+        # is then delivered again on reconnect rather than skipped.
+        latest = self.db.one(select(func.max(schema.monitor_events.c.id).label('id')))['id'] or 0
         total = self.db.one(select(func.count().label('n')).select_from(query.subquery()))['n']
+        eligible = query.with_only_columns(schema.monitors.c.revision_id).subquery()
+        field_total = self.db.one(select(func.coalesce(func.sum(func.json_array_length(schema.monitor_revisions.c.fields)), 0).label('n')).where(schema.monitor_revisions.c.id.in_(select(eligible.c.revision_id))))['n']
+        from sqlalchemy import or_
+        overdue = time.time() - sources.c.config['interval'].as_float()
+        needs_attention = or_(schema.monitor_field_states.c.status.not_in(['ok', 'pending']), schema.monitor_field_states.c.last_verified_at < overdue)
+        attention_total = self.db.one(select(func.count().label('n')).select_from(schema.monitor_field_states.join(schema.monitors, schema.monitor_field_states.c.revision_id == schema.monitors.c.revision_id).join(sources, schema.monitors.c.source_id == sources.c.id)).where(schema.monitors.c.revision_id.in_(select(eligible.c.revision_id)), needs_attention))['n']
         if cursor:
             query = query.where(schema.monitors.c.id > cursor)
         rows = self.db.all(query.order_by(schema.monitors.c.id).limit(limit+1))
@@ -387,6 +396,11 @@ class MonitorService:
         revision_ids = [row['revision_id'] for row in rows]
         revisions = {row['id']: row for row in self.db.all(select(schema.monitor_revisions).where(schema.monitor_revisions.c.id.in_(revision_ids)))} if revision_ids else {}
         states = {(row['revision_id'], row['field_id']): row for row in self.db.all(select(schema.monitor_field_states).where(schema.monitor_field_states.c.revision_id.in_(revision_ids)))} if revision_ids else {}
+        changes = schema.monitor_changes
+        ranked = select(changes, func.row_number().over(partition_by=[changes.c.revision_id, changes.c.field_id], order_by=[changes.c.at.desc(), changes.c.id.desc()]).label('position')).where(changes.c.revision_id.in_(revision_ids), changes.c.kind.in_(['changed', 'new_period'])).subquery()
+        latest_changes = {(r['revision_id'], r['field_id']): r for r in self.db.all(select(ranked).where(ranked.c.position == 1))} if revision_ids else {}
+        before_ids = [r['previous_observation_id'] for r in latest_changes.values() if r['previous_observation_id']]
+        before = {r['id']: r for r in self.db.all(select(schema.monitor_observations).where(schema.monitor_observations.c.id.in_(before_ids)))} if before_ids else {}
         monitors, widgets, attention, source_list = [], [], [], {}
         for row in rows:
             fields = []
@@ -394,16 +408,24 @@ class MonitorService:
                 state = states.get((row['revision_id'], definition['id']), {})
                 field = {**definition, **{key: state.get(key) for key in ('value', 'raw_text', 'unit', 'period', 'locator', 'capture_id', 'last_checked_at', 'last_verified_at', 'last_changed_at', 'error')}, 'status': state.get('status', 'pending'), 'monitor_id': row['id'], 'source_id': row['source_id'], 'source_name': row['source_name']}
                 field['observation_id'] = state.get('observation_id')
+                change = latest_changes.get((row['revision_id'], definition['id']))
+                if change:
+                    field['change'] = change['detail']
+                    previous = before.get(change['previous_observation_id'])
+                    if previous and previous['unit'] == field['unit'] and previous['period'] == field['period']:
+                        field['previous_value'] = previous['value']
+                        field['previous_period'] = previous['period']
+                if field['status'] == 'ok' and (field['last_verified_at'] or 0) < time.time()-row['source_config']['interval']:
+                    field.update(status='stale', error='Verification is older than the check interval. Check that Parity services are running.')
                 if field['status'] not in ('ok', 'pending'):
                     attention.append({'monitor_id': row['id'], 'field_id': field['id'], 'name': field['name'], 'status': field['status'], 'error': field['error'], 'action': 'Repair extraction' if field['status'] in ('missing', 'invalid') else 'Check source'})
                 fields.append(field)
                 widgets.append(field)
-            monitor = {key: value for key, value in row.items() if key not in ('source_config', 'source_paused', 'source_enabled')}
-            monitor.update(fields=fields, is_demo=bool(row['source_config'].get('demo')), paused=bool(row['paused'] or row['source_paused'] or not row['source_enabled']), next_check_at=row['next_due'] if not row['source_paused'] else None, interval=row['source_config']['interval'], last_checked_at=max([field['last_checked_at'] or 0 for field in fields], default=0) or None, last_verified_at=min([field['last_verified_at'] or 0 for field in fields], default=0) or None)
+            monitor = {key: value for key, value in row.items() if key not in ('source_config', 'source_paused', 'source_enabled', 'source_root_url', 'source_created_at')}
+            monitor.update(fields=fields, is_demo=bool(row['source_config'].get('demo') or row['source_config'].get('source_kind') in ('demo', 'benchmark')), paused=bool(row['paused'] or row['source_paused'] or not row['source_enabled']), next_check_at=row['next_due'] if not row['source_paused'] and not row['paused'] and row['source_enabled'] else None, interval=row['source_config']['interval'], last_checked_at=max([field['last_checked_at'] or 0 for field in fields], default=0) or None, last_verified_at=min([field['last_verified_at'] or 0 for field in fields], default=0) or None)
             monitors.append(monitor)
-            source_list[row['source_id']] = {'id': row['source_id'], 'name': row['source_name'], 'is_demo': monitor['is_demo']}
-        latest = self.db.one(select(func.max(schema.monitor_events.c.id).label('id')))['id'] or 0
-        return {'monitors': monitors, 'widgets': widgets, 'sources': list(source_list.values()), 'attention': attention, 'totals': {'monitors': total, 'fields': len(widgets), 'attention': len(attention)}, 'layout': self.layout(), 'event_id': latest, 'next_cursor': next_cursor, 'total': total}
+            source_list[row['source_id']] = {'id': row['source_id'], 'name': row['source_name'], 'root_url': row['source_root_url'], 'config': row['source_config'], 'enabled': row['source_enabled'], 'paused': row['source_paused'], 'created_at': row['source_created_at'], 'next_due': row['next_due'], 'is_demo': monitor['is_demo']}
+        return {'monitors': monitors, 'widgets': widgets, 'sources': list(source_list.values()), 'attention': attention, 'totals': {'monitors': total, 'fields': int(field_total), 'attention': attention_total}, 'layout': self.layout(), 'event_id': latest, 'next_cursor': next_cursor, 'total': total}
 
     def history(self, field_id, limit=50, cursor=None, monitor_id=None):
         table = schema.monitor_observations
@@ -431,7 +453,7 @@ class MonitorService:
         if monitor_id:
             query = query.where(table.c.monitor_id == monitor_id)
         if not include_demo:
-            query = query.where(sources.c.config['demo'].as_boolean().is_not(True))
+            query = query.where(sources.c.config['demo'].as_boolean().is_not(True), func.coalesce(sources.c.config['source_kind'].as_string(), 'normal') == 'normal')
         if kind:
             query = query.where(table.c.kind == kind)
         if q:

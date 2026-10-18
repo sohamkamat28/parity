@@ -203,8 +203,9 @@ def test_generic_layouts_and_scope(tmp_path,monkeypatch):
         result=s.run(s.enqueue(src["id"])["id"])
         assert result["metrics"]["created"]==2,result
         assert all("/docs/" in p["url"] for p in s.overview()["pages"])
-        assert any("Authorization" in r["text"] for r in s.search("API authentication token")["results"])
-        assert any("100 per minute" in r["text"] for r in s.search("request limit")["results"])
+        assert s.search("API authentication token")["results"] == []
+        assert any("Authorization" in r["text"] for r in s.search("API authentication token",source_ids=[src['id']])["results"])
+        assert any("100 per minute" in r["text"] for r in s.search("request limit",source_ids=[src['id']])["results"])
     finally:server.shutdown();server.server_close()
 
 def test_worker_recovers_abandoned_job(system):

@@ -12,7 +12,7 @@ async def test_mcp(service):
     calls=[('search_docs',{'query':'honours registration deadline'}),('get_page',{'page_id':candidate['id'],'version':1}),
            ('get_page_history',{'page_id':candidate['id']}),('diff_versions',{'page_id':candidate['id'],'v1':1,'v2':candidate['number']}),('list_recent_changes',{'limit':5})]
     started=time.perf_counter();results=[]
-    env={**os.environ,'PARITY_DATA_DIR':str(config.DATA),'DATABASE_URL':str(service.db.engine.url),'PYTHONPATH':str(config.ROOT),
+    env={**os.environ,'PARITY_DATA_DIR':str(config.DATA),'DATABASE_URL':service.db.engine.url.render_as_string(hide_password=False),'PYTHONPATH':str(config.ROOT),
          'PARITY_OFFLINE':'1','PARITY_MCP_API_URL':f'http://127.0.0.1:{config.API_PORT}'}
     params=StdioServerParameters(command=sys.executable,args=['-m','parity.mcp_server'],cwd=str(config.ROOT),env=env)
     try:
