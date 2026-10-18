@@ -16,7 +16,7 @@ Updated 18 October 2026. This is a tested development candidate, with remaining 
 
 ## Verification
 
-The local combined suite passed **107 tests**, with **3 intentional SQLite skips for PostgreSQL-only cases** that passed on PostgreSQL. Production frontend build, dependency compatibility and compile checks pass. Browser rehearsals passed with models stopped and enabled, including automatic updates, polling fallback, failed-check recovery, narrow/keyboard navigation and monitoring after tab closure. Public scalar/list/table extraction passed on accessible pages.
+The local combined suite passed **107 tests**, with **3 intentional SQLite skips for PostgreSQL-only cases** that passed on PostgreSQL. Production frontend build, dependency compatibility and compile checks pass. The complete macOS setup entry point also completed against a separate empty development database with verified cached model/runtime/browser assets. Browser rehearsals passed with models stopped and enabled, including automatic updates, polling fallback, failed-check recovery, narrow/keyboard navigation and monitoring after tab closure. Public scalar/list/table extraction passed on accessible pages.
 
 Windows and Ubuntu backend, PostgreSQL integration and frontend checks passed on [the corrected CI run](https://github.com/sohamkamat28/parity/actions/runs/39095600869). Subsequent branch runs add the full PostgreSQL browser rehearsal and final integration checks; see [current CI runs](https://github.com/sohamkamat28/parity/actions).
 
@@ -32,6 +32,6 @@ Structured PDF field mapping, authenticated sites and multi-user/public hosting 
 
 ## Source and delivery
 
-Upstream remains `yajask-maker/parity` at the inspected checkpoint. This device's account has read-only access there, so branch `development/parity-v2-device-integration` is pushed to [the fork](https://github.com/sohamkamat28/parity/tree/development/parity-v2-device-integration) for upstream review. The pull request link is added here when created.
+Upstream remains `yajask-maker/parity` at the inspected checkpoint. This device's account has read-only access there, so branch `development/parity-v2-device-integration` is pushed to [the fork](https://github.com/sohamkamat28/parity/tree/development/parity-v2-device-integration) for upstream review. Upstream review: [pull request #1](https://github.com/yajask-maker/parity/pull/1).
 
 The versioned source ZIP and SHA-256 manifest are generated locally under `outputs/`; the ZIP includes the exact Git revision in `BUILD_INFO.json`, source, operating documentation, tests and prebuilt frontend, and excludes secrets, runtime data, captures, dependencies and downloaded assets. Historical `docs/v1` and `archive/v1` reports do not verify v2.

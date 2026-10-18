@@ -4,7 +4,7 @@ Verified on 18 October 2026 from the current development branch. Upstream was fe
 
 ## Result
 
-The monitoring-to-dashboard flow works on this device with native Python services and PostgreSQL/pgvector in Docker. It also works with answer and embedding services stopped. Free native Qwen chat and shared MiniLM were exercised separately. Source, prebuilt frontend, Windows setup/launchers, Docker configuration, transfer tools, reproducible tests/benchmarks and packaging are included.
+The monitoring-to-dashboard flow works on this device with native Python services and PostgreSQL/pgvector in Docker. It also works with answer and embedding services stopped. Free native Qwen chat and shared MiniLM were exercised separately. Source, prebuilt frontend, Windows setup/launchers, Docker configuration, transfer tools, reproducible tests/benchmarks and packaging are included. The full native macOS setup entry point completed, and a separate empty development database is configured locally.
 
 The signed-in account lacks push permission on `yajask-maker/parity`; the development branch is pushed to `sohamkamat28/parity` for an upstream pull request. No force push, merge, visibility change or repository setting change was performed.
 
@@ -97,4 +97,4 @@ At 50k, PostgreSQL database size was approximately **339 MiB**, the benchmark ha
 
 ## Delivery status
 
-Source and prebuilt assets are on `development/parity-v2-device-integration` in the fork, with an upstream pull request. A versioned source ZIP and SHA-256 manifest are generated in `outputs/` from the final committed source; `BUILD_INFO.json` identifies that commit. Read [the operating guide](OPERATING_GUIDE.md) and [presentation walkthrough](PRESENTATION_WALKTHROUGH.md) before a demonstration. The final PR and CI links are recorded in `IMPLEMENTATION_STATUS.md`.
+Source and prebuilt assets are on `development/parity-v2-device-integration` in the fork, with [upstream pull request #1](https://github.com/yajask-maker/parity/pull/1). A versioned source ZIP and SHA-256 manifest are generated in `outputs/` from the final committed source; `BUILD_INFO.json` identifies that commit. Read [the operating guide](OPERATING_GUIDE.md) and [presentation walkthrough](PRESENTATION_WALKTHROUGH.md) before a demonstration. The final PR and CI links are recorded in `IMPLEMENTATION_STATUS.md`.
