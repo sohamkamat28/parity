@@ -66,18 +66,10 @@ def main():
                     page.get_by_role('button',name='Add tracked information').click()
                     dialog=page.get_by_role('dialog');dialog.get_by_role('button',name='Next',exact=True).click()
                     dialog.get_by_label('Monitoring instructions').fill('Track Current Price, Promoter holding, Quarterly results and Announcements')
-                    dialog.get_by_role('button',name='Preview extraction',exact=True).click()
-                    expect(dialog.get_by_text('Review the extracted information',exact=True)).to_be_visible(timeout=50000)
-                    wanted={'Current Price':'currency','Promoter holding':'percentage','Quarterly results':'table','Announcements':'list'}
-                    cards=dialog.locator('.preview-field')
-                    for i in reversed(range(cards.count())):
-                        card=cards.nth(i);name=card.get_by_label('Field name',exact=True).input_value();kind=card.locator('select').first.input_value()
-                        if wanted.get(name)!=kind:card.get_by_role('button',name='Remove '+name,exact=True).click()
-                    assert cards.count()==4
-                    dialog.get_by_role('button',name='Scope & schedule',exact=True).click()
-                    dialog.get_by_role('button',name='Start monitoring',exact=True).click()
-                    expect(dialog).not_to_be_visible(timeout=15000)
-                    passed('Four-step source setup, reviewed scalar/table/list fields, preserved 10-second fixture schedule')
+                    dialog.get_by_role('button',name='Start automatically',exact=True).click()
+                    expect(dialog).not_to_be_visible(timeout=90000)
+                    expect(page.get_by_role('heading',name='Dashboard',exact=True)).to_be_visible()
+                    passed('Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps')
                     page.locator('.nav-item').filter(has_text='Dashboard').click()
                     page.get_by_label('Include test sources',exact=True).check()
                     price=page.locator('.monitor-widget').filter(has=page.get_by_role('heading',name='Current Price',exact=True))
@@ -136,6 +128,15 @@ def main():
                     eventually(lambda:any(f['name']=='Current Price' and f['value']=='1200.5' for f in client.get('/api/dashboard?include_demo=true').json()['widgets']))
                     assert field['id'] in client.get('/api/dashboard/layout').json()['pinned']
                     passed('Scheduled monitoring continues with browser tab closed; layout persists')
+                    # A normal unlabelled JS price is discovered without choosing a rendering mode.
+                    planned=client.post('/api/monitors/auto-preview',json={'root_url':portal+'/en/automatic-price','instructions':'Track current price','settings':{'demo':True}})
+                    planned.raise_for_status();draft=planned.json()
+                    assert draft['source']['config']['render_mode']=='browser'
+                    assert len(draft['fields'])==1 and draft['fields'][0]['preview']['value']=='42.5'
+                    activated=client.post('/api/monitors',json={'draft_id':draft['draft_id'],'fields':draft['fields']})
+                    activated.raise_for_status()
+                    assert activated.json()['source']['config']['interval']==900
+                    passed('Automatically selects Chromium for a JavaScript-only price and validates baseline before activation')
                     if args.with_models:
                         eventually(lambda:client.get('/api/runtime').json()['embedding']['status']=='ready',90)
                         eventually(lambda:client.post('/api/chat/test').status_code==200,120)

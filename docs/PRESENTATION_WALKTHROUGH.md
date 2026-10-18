@@ -12,7 +12,7 @@ Use the current verification report, not v1 reports, to describe what has been d
 
 Open Sources → Start monitoring. Enter a public URL and a clear name, then describe specific fields. Show the detected candidates and their actual values. Review the raw text, normalized unit, reporting period and location. Show that zero remains zero, and that a missing selector must be repaired or removed before activation.
 
-Demonstrate manual selection with AI unavailable. If using a table cell, explicitly select fixed/latest period and the newest-column position. Show Advanced settings only when explaining rendering, selectors or resource permissions. At Scope & schedule, explain the default: this page, one document, zero link depth, 15 minutes and an immediate baseline. Existing source schedules are preserved.
+Click Start automatically after entering the URL and instructions. Show the dashboard without editing selectors, fields, rendering or widget types. Explain that Parity validates the values internally and uses cards, tables and lists based on their types. Repeat with AI unavailable to demonstrate deterministic detection. For optional customization, use Preview extraction or edit saved rules; latest-period selection remains explicit. New sources use one page, zero link depth and a 15-minute schedule; existing schedules are preserved.
 
 ## 2. Read the dashboard
 

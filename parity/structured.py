@@ -22,7 +22,7 @@ def fingerprint(value):
 
 def soup_for(body):
     soup = BeautifulSoup(body, 'html.parser')
-    for node in soup.select('script,style,noscript,template,iframe,object,svg'):
+    for node in soup.select('script,style,noscript,template,iframe,object,svg,[hidden],[aria-hidden="true"]'):
         node.decompose()
     return soup
 
@@ -271,6 +271,12 @@ def discover(body, url):
             item.update(preview=None, valid=False, error=str(error))
         candidates.append(item)
     for table in soup.select('table')[:12]:
+        property_rows = [row.find_all(['th', 'td'], recursive=False) for row in table.find_all('tr')]
+        if property_rows and all(len(cells) == 2 and cells[0].name == 'th' and cells[1].name == 'td' for cells in property_rows):
+            # Product/specification tables have labels, not reporting-period headers.
+            for label, value in property_rows[:40]:
+                add(label.get_text(' ', strip=True), infer_type(value.get_text(' ', strip=True)), {'kind': 'scalar', 'selector': css_path(value)})
+            continue
         heading = table.find_previous(['h1', 'h2', 'h3', 'h4'])
         title = clean(heading.get_text(' ', strip=True)) if heading else 'Table'
         selector = css_path(table)
@@ -297,6 +303,50 @@ def discover(body, url):
         attribute = 'datetime' if node.name == 'time' else None
         raw = node.get(attribute) if attribute else node.get_text(' ', strip=True)
         add(node.get('data-monitor') or 'Date', infer_type(raw), {'kind': 'scalar', 'selector': css_path(node), **({'attribute': attribute} if attribute else {})})
+    # Ordinary product/metric markup rarely uses our fixture's .name/.value classes.
+    # Generate rules from actual DOM locations, then validate them just like manual rules.
+    for node in soup.select('span,strong,b,div,p,output,[itemprop="price"]')[:2500]:
+        if node.find_parent(['nav', 'footer', 'header', 'table', 'del', 's']):
+            continue
+        attribute = 'content' if node.get('itemprop') == 'price' and node.has_attr('content') else None
+        raw = clean(node.get(attribute)) if attribute else clean(node.get_text(' ', strip=True))
+        if not raw or len(raw) > 160:
+            continue
+        # Prefer the innermost element representing a value, not its wrappers.
+        if not attribute and any(clean(child.get_text(' ', strip=True)) == raw for child in node.find_all(recursive=False)):
+            continue
+        selector = css_path(node)
+        if any(c['rule']['selector'] in (selector, css_path(node.parent)) and c['rule']['kind'] in ('scalar', 'label_value') for c in candidates):
+            continue
+        # A single text node such as "Current price: $12.50" is also a field.
+        pair = re.fullmatch(r'([^:]{2,70}):\s*(.+)', raw)
+        if pair and infer_type(pair[2]) != 'text':
+            add(pair[1], infer_type(pair[2]), {'kind': 'label_value', 'selector': selector, 'label': pair[1]})
+            continue
+        kind = infer_type(raw)
+        if kind == 'text':
+            continue
+        previous = node.find_previous_sibling()
+        label = clean(previous.get_text(' ', strip=True)) if previous else ''
+        if not label or len(label) > 70 or infer_type(label) != 'text':
+            label = ''
+        semantics = ' '.join([node.get('itemprop', ''), node.get('id', ''), *node.get('class', []), node.get('data-testid', '')]).lower()
+        if label and ('price' in semantics or (kind == 'currency' and previous.name in ('h1', 'h2', 'h3'))) and 'price' not in label.lower():
+            label = 'Current price — '+label
+        if not label and ('price' in semantics or kind == 'currency'):
+            label = 'Current price'
+        if not label:
+            label = clean(node.get('aria-label') or node.get('data-label'))
+        if not label:
+            continue
+        rule = {'kind': 'scalar', 'selector': selector}
+        if attribute:
+            rule['attribute'] = attribute
+        elif previous and clean(node.parent.get_text(' ', strip=True)).startswith(label):
+            # Bind the pair to its label so a shifted layout fails validation.
+            rule = {'kind': 'label_value', 'selector': css_path(node.parent), 'label': label,
+                    'value_selector': ':scope > '+selector.split(' > ')[-1]}
+        add(label, kind, rule)
     for node in soup.select('h1,h2,h3,p')[:60]:
         raw = clean(node.get_text(' ', strip=True))
         if raw and len(raw) <= 1200:
@@ -310,8 +360,14 @@ def discover(body, url):
 
 
 def suggest(candidates, instructions):
-    words = set(re.findall(r'[a-z0-9]+', instructions.casefold())) - {'track', 'the', 'and', 'of', 'a', 'in', 'with', 'latest', 'displayed', 'new'}
-    synonyms = {'price': {'price', 'current', 'quote'}, 'revenue': {'revenue', 'sales', 'income'}, 'announcements': {'announcements', 'announcement', 'updates', 'news', 'notices'}, 'holding': {'holding', 'shareholding', 'promoter'}, 'capitalization': {'capitalization', 'cap'}}
+    words = set(re.findall(r'[a-z0-9]+', instructions.casefold())) - {'track', 'monitor', 'show', 'me', 'please', 'the', 'and', 'of', 'a', 'in', 'with', 'latest', 'displayed', 'new', 'current'}
+    synonyms = {'price': {'price', 'cost', 'quote'}, 'prices': {'price', 'cost', 'quote'}, 'cost': {'price', 'cost'}, 'revenue': {'revenue', 'sales', 'income'}, 'announcements': {'announcements', 'announcement', 'updates', 'news', 'notices'}, 'holding': {'holding', 'shareholding', 'promoter'}, 'capitalization': {'capitalization', 'cap'}}
     words |= set().union(*(synonyms.get(word, set()) for word in list(words))) if words else set()
-    ranked = sorted(candidates, key=lambda item: (-len(words & set(re.findall(r'[a-z0-9]+', item['name'].casefold()))), item['type'] in ('table', 'list')))
-    return [item for item in ranked if item['valid'] and words & set(re.findall(r'[a-z0-9]+', item['name'].casefold()))][:12]
+    ranked = sorted(candidates, key=lambda item: (item['type']=='text', -len(words & set(re.findall(r'[a-z0-9]+', item['name'].casefold())))))
+    selected = [item for item in ranked if item['valid'] and words & set(re.findall(r'[a-z0-9]+', item['name'].casefold()))]
+    # Do not also select a heading/paragraph that merely repeats a typed field's label.
+    typed_words = set().union(*(set(re.findall(r'[a-z0-9]+', item['name'].casefold())) for item in selected if item['type'] != 'text'))
+    selected = [item for item in selected if item['type'] != 'text' or not (words & set(re.findall(r'[a-z0-9]+', item['name'].casefold()))) <= typed_words]
+    if re.search(r'\bcurrent price\b', instructions, re.I) and any('current price' in item['name'].lower() for item in selected) and 'tax' not in instructions.lower():
+        selected = [item for item in selected if 'price' not in item['name'].lower() or 'current price' in item['name'].lower()]
+    return selected[:12]

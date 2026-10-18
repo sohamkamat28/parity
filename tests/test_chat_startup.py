@@ -143,3 +143,12 @@ def test_mac_runtime_reinstall_preserves_existing_mapped_file(tmp_path):
         assert executable.read_bytes()==b'new executable'
         assert executable.stat().st_ino!=old_inode
         assert executable.stat().st_mode & 0o111
+
+@pytest.mark.skipif(sys.platform=='win32',reason='POSIX TIME_WAIT reuse; Windows keeps exclusive bind checks')
+def test_launcher_port_probe_allows_clean_restart():
+    listener=socket.socket();listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+    listener.bind(('127.0.0.1',0));port=listener.getsockname()[1];listener.listen()
+    client=socket.create_connection(('127.0.0.1',port));accepted,_=listener.accept()
+    accepted.shutdown(socket.SHUT_WR);assert client.recv(1)==b''
+    client.close();accepted.close();listener.close()
+    ensure_ports_available([('restarted service',port)])

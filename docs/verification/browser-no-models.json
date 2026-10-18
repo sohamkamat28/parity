@@ -1,7 +1,7 @@
 {
   "models": "stopped",
   "checks": [
-    "Four-step source setup, reviewed scalar/table/list fields, preserved 10-second fixture schedule",
+    "Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps",
     "Dashboard zero/currency/table/list rendering and default demo isolation with PostgreSQL",
     "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
     "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
@@ -11,8 +11,8 @@
     "Scheduled monitoring continues with browser tab closed; layout persists"
   ],
   "screenshots": [
-    "outputs/runtime/browser-f76f9f1a7e914108a27f5c698af27995/desktop.png",
-    "outputs/runtime/browser-f76f9f1a7e914108a27f5c698af27995/narrow.png"
+    "outputs/runtime/browser-e1d503014fbd4f0ea0d7390887adac38/desktop.png",
+    "outputs/runtime/browser-e1d503014fbd4f0ea0d7390887adac38/narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

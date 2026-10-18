@@ -96,6 +96,8 @@ def create_router(service,chat):
 
     @router.post('/api/monitors/preview')
     def preview(body:dict):return monitor.preview(body)
+    @router.post('/api/monitors/auto-preview')
+    def auto_preview(body:dict):return monitor.auto_preview(body)
     @router.post('/api/monitors')
     def activate(body:dict):return monitor.activate(body)
     @router.get('/api/monitors')

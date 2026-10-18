@@ -1,7 +1,7 @@
 {
   "models": "enabled",
   "checks": [
-    "Four-step source setup, reviewed scalar/table/list fields, preserved 10-second fixture schedule",
+    "Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps",
     "Dashboard zero/currency/table/list rendering and default demo isolation with PostgreSQL",
     "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
     "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
@@ -9,11 +9,12 @@
     "Polling fallback delivers scheduled announcement updates",
     "390px layout, keyboard navigation, focus management and reduced-motion setting",
     "Scheduled monitoring continues with browser tab closed; layout persists",
+    "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation",
     "Native free Qwen chat selects immutable evidence with shared MiniLM available"
   ],
   "screenshots": [
-    "outputs/runtime/browser-f93aa3a1cea5496c990cc769683bcc9c/desktop.png",
-    "outputs/runtime/browser-f93aa3a1cea5496c990cc769683bcc9c/narrow.png"
+    "outputs/runtime/browser-677db7da6fed409fa7d993db47a12211/desktop.png",
+    "outputs/runtime/browser-677db7da6fed409fa7d993db47a12211/narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

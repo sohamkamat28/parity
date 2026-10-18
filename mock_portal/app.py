@@ -139,6 +139,12 @@ def structured_fixture(request:Request):
     <h2>Announcements</h2><ul id="news">{news}</ul></article>'''
     return response(request,'Structured monitoring test page',body,state)
 
+@app.get('/en/automatic-price')
+def automatic_price_fixture():
+    return HTMLResponse('''<!doctype html><html><head><title>Automatic extraction test</title></head>
+    <body><main><h1>Synthetic product</h1><div id="quote">Loading…</div></main>
+    <script>document.getElementById('quote').innerHTML='<p>Current price: $42.50</p>';</script></body></html>''')
+
 @app.get("/en/circulars/{slug}")
 def notice(slug:str,request:Request):
     s=read_state()

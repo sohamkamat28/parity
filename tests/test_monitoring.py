@@ -181,3 +181,87 @@ def test_scope_layout_pause_and_pagination(monitor):
     second=m.history(field,limit=1,cursor=first['next_cursor'])
     assert first['total']==2 and second['items'][0]['id']!=first['items'][0]['id']
     assert m.events_since(0)
+
+@pytest.mark.parametrize('markup,instruction,expected',[
+    ('<main><h1>Widget</h1><p class="price_color">£51.77</p></main>', 'Track the current price', '51.77'),
+    ('<div><span>Revenue</span><strong>1200</strong></div>', 'Monitor revenue', '1200'),
+    ('<p>Current price: $0</p>', 'Track current price', '0'),
+    ('<section><h2>Current price</h2><div><span>$42.50</span></div></section>', 'Track price', '42.5'),
+    ('<meta itemprop="price" content="19.99">', 'Track price', '19.99'),
+])
+def test_automatic_discovery_without_fixture_classes(markup,instruction,expected):
+    fields=suggest(discover(markup,URL),instruction)
+    assert len(fields)==1 and fields[0]['valid']
+    assert fields[0]['preview']['value']==expected
+    assert fields[0]['type'] in ('number','currency')
+    assert extract_field(markup,fields[0],URL)['value']==expected
+
+
+def test_automatic_rules_capture_changes_and_fail_on_shifted_labels():
+    body='<section><span>Revenue</span><strong>1200</strong></section>'
+    field=suggest(discover(body,URL),'Track revenue')[0]
+    assert extract_field(body.replace('1200','1300'),field,URL)['value']=='1300'
+    with pytest.raises(LookupError):extract_field(body.replace('Revenue','Expenses'),field,URL)
+    assert not suggest(discover('<div hidden><p>Current price: $99</p></div>',URL),'Track price')
+
+
+def test_automatic_setup_publishes_widgets_without_field_edits(monitor,monkeypatch):
+    m,_=monitor
+    monkeypatch.setattr(m,'_ai_suggest',lambda *args:[])  # A model may find no selection.
+    draft=m.auto_preview({'root_url':URL,'instructions':'Track current price, promoter holding, quarterly results and announcements'})
+    result=m.activate({'draft_id':draft['draft_id'],'fields':draft['fields']})
+    widgets=m.dashboard()['widgets']
+    assert {w['type'] for w in widgets}=={'currency','percentage','table','list'}
+    assert len(widgets)==4 and all(w['capture_id'] for w in widgets)
+    assert result['source']['config']['interval']==900
+    again=m.activate({'draft_id':draft['draft_id'],'fields':draft['fields']})
+    assert again['monitor']['id']==result['monitor']['id'] and len(m.dashboard()['widgets'])==4
+
+
+def test_automatic_setup_chooses_rendering_only_when_needed(monitor,monkeypatch):
+    from parity import browser
+    m,fetcher=monitor;fetcher.body='<main>Loading…</main>';calls=[]
+    def render(service,url,source):
+        calls.append(source['config'])
+        return Response(url,200,{'content-type':'text/html'},b'<p>Current price: $15</p>')
+    monkeypatch.setattr(browser,'preview_capture',render)
+    draft=m.auto_preview({'root_url':URL,'instructions':'Track price','use_ai':False})
+    result=m.activate({'draft_id':draft['draft_id'],'fields':draft['fields']})
+    assert len(calls)==1 and calls[0]['resource_origins']==[]
+    assert result['source']['config']['render_mode']=='browser'
+    assert m.dashboard()['widgets'][0]['value']=='15'
+
+
+def test_unmatched_automatic_setup_never_activates_unrelated_values(monitor,monkeypatch):
+    from parity import browser
+    m,fetcher=monitor;fetcher.body='<p>Welcome</p>'
+    monkeypatch.setattr(browser,'preview_capture',lambda *args:Response(URL,200,{},b'<p>Still no requested value</p>'))
+    with pytest.raises(ValueError,match='could not identify'):
+        m.auto_preview({'root_url':URL,'instructions':'Track price','use_ai':False})
+    assert m.dashboard()['totals']['monitors']==0
+
+
+def test_automatic_price_ignores_hidden_fields_and_table_header_periods():
+    body='''<main><h1>Widget</h1><p class="price">£12</p>
+    <table><tr><th>SKU</th><td>123456</td></tr><tr><th>Price (incl. tax)</th><td>£12</td></tr></table>
+    <p hidden>Current price: £999</p></main>'''
+    fields=suggest(discover(body,URL),'Track current price')
+    assert len(fields)==1 and fields[0]['preview']['value']=='12'
+    assert fields[0]['preview']['period']==''
+    tax=suggest(discover(body,URL),'Track price including tax')
+    assert all(f['preview']['period']=='' for f in tax)
+
+
+def test_automatic_selection_omits_boilerplate_matching_generic_words():
+    fields=suggest(discover(HTML+'<p>These are synthetic company results.</p>',URL),'Track current price, quarterly results and announcements')
+    assert {f['type'] for f in fields}=={'currency','table','list'}
+    assert len(fields)==3
+
+
+def test_automatic_price_does_not_activate_a_heading(monitor,monkeypatch):
+    from parity import browser
+    m,fetcher=monitor;fetcher.body='<h1>Current price</h1>'
+    monkeypatch.setattr(browser,'preview_capture',lambda *args:Response(URL,200,{},b'<h1>Current price</h1>'))
+    with pytest.raises(ValueError,match='could not identify'):
+        m.auto_preview({'root_url':URL,'instructions':'Track current price','use_ai':False})
+    assert m.dashboard()['totals']['monitors']==0

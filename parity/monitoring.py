@@ -3,6 +3,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -138,9 +139,12 @@ class MonitorService:
         if payload.get('fields') is not None:
             fields = self._validated_fields(payload['fields'], body, capture['url'])
         else:
-            fields = self._ai_suggest(candidates, instructions) if payload.get('use_ai', True) else None
-            assistance = 'local_model' if fields is not None else 'detected_labels'
-            fields = fields if fields is not None else suggest(candidates, instructions)
+            fields = suggest(candidates, instructions)
+            assistance = 'detected_labels'
+            if not fields and payload.get('use_ai', True):
+                fields = self._ai_suggest(candidates, instructions) or []
+                if fields:
+                    assistance = 'local_model'
         included, excluded = [source['root_url']], []
         single = source['config']['max_pages'] == 1 and source['config']['max_depth'] == 0
         for anchor in soup_for(body).select('a[href]')[:200]:
@@ -164,6 +168,33 @@ class MonitorService:
                 'scope': {'included': included, 'excluded': excluded, 'max_pages': source['config']['max_pages'], 'max_depth': source['config']['max_depth']},
                 'capture_id': capture['id'], 'assistance': assistance,
                 'message': 'Review each selected field before starting monitoring.' if fields else 'Select the fields you want to track from the detected information, or add an extraction rule.'}
+
+    def auto_preview(self, payload):
+        """Choose and validate extraction before the UI activates the saved draft.
+
+        The draft is the retry token for activation. Browser fallback retains the
+        same validated network restrictions and never grants extra resource origins.
+        """
+        request = {key: value for key, value in payload.items() if key not in ('fields', 'draft_id')}
+        if not clean(request.get('instructions')):
+            raise ValueError('Describe the information you want to monitor.')
+        def checked_preview():
+            result = self.preview(request)
+            numeric_request = re.search(r'\b(price|prices|cost|revenue|profit|holding|capitalization|volume|temperature)\b', request['instructions'], re.I)
+            # A heading called "Price" is not a successfully extracted price.
+            if numeric_request and result['fields'] and all(field['type'] == 'text' for field in result['fields']):
+                result['fields'] = []
+            return result
+        result = checked_preview()
+        if not any(field['valid'] for field in result['fields']) and result['source']['config'].get('render_mode') != 'browser':
+            request['settings'] = {**result['source']['config'], 'render_mode': 'browser'}
+            result = checked_preview()
+        if not any(field['valid'] for field in result['fields']):
+            raise ValueError('Parity could not identify the requested information in this page, including its rendered content. '
+                             'Try a more specific description or a direct page containing the value. Monitoring has not been started.')
+        result['fields'] = [field for field in result['fields'] if field['valid']]
+        result['message'] = 'Extraction validated. Ready to create dashboard widgets automatically.'
+        return result
 
     def _activate(self, payload, monitor_id=None):
         from .db import uid, sources

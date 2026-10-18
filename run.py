@@ -33,6 +33,10 @@ def ensure_ports_available(ports):
             raise LaunchError(f"Port {port} is assigned to more than one Parity service.")
         seen.add(port)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            # Match the servers' POSIX bind behavior after a clean restart.
+            # TIME_WAIT connections are not an existing listening service.
+            if os.name != 'nt':
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 sock.bind(("127.0.0.1", port))
             except OSError as error:
@@ -293,4 +297,10 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    # Test harnesses and service managers send SIGTERM, not terminal Ctrl+C.
+    # Route it through main's finally block so model/worker sessions are reaped.
+    import signal
+    def stop_owned_services(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, stop_owned_services)
     raise SystemExit(main())
