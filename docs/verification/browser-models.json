@@ -13,12 +13,15 @@
     "390px layout, keyboard navigation, focus management and reduced-motion setting",
     "Scheduled monitoring continues with browser tab closed; layout persists",
     "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation",
+    "Source-grouped overview combines multiple monitors, keeps fields with their website, and preserves filters, hiding, pins, keyboard details and history at desktop/390px",
     "Native free Qwen chat selects immutable evidence with shared MiniLM available",
     "Remove/restore UI retains immutable evidence, hides active source and restores with monitoring paused"
   ],
   "screenshots": [
-    "outputs/runtime/browser-7ed887f620e546149803731b04b20178/desktop.png",
-    "outputs/runtime/browser-7ed887f620e546149803731b04b20178/narrow.png"
+    "outputs/runtime/browser-fee1a9df7712434c844c0abc1ba3d82c/desktop.png",
+    "outputs/runtime/browser-fee1a9df7712434c844c0abc1ba3d82c/narrow.png",
+    "outputs/runtime/browser-fee1a9df7712434c844c0abc1ba3d82c/source-grouped.png",
+    "outputs/runtime/browser-fee1a9df7712434c844c0abc1ba3d82c/source-grouped-narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

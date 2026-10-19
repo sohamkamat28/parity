@@ -13,11 +13,14 @@
     "390px layout, keyboard navigation, focus management and reduced-motion setting",
     "Scheduled monitoring continues with browser tab closed; layout persists",
     "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation",
+    "Source-grouped overview combines multiple monitors, keeps fields with their website, and preserves filters, hiding, pins, source-local ordering without dropping other-source preferences, keyboard details and history at desktop/390px",
     "Remove/restore UI retains immutable evidence, hides active source and restores with monitoring paused"
   ],
   "screenshots": [
-    "outputs/runtime/browser-84d661d3dbf34498b2945226239f48eb/desktop.png",
-    "outputs/runtime/browser-84d661d3dbf34498b2945226239f48eb/narrow.png"
+    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/desktop.png",
+    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/narrow.png",
+    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/source-grouped.png",
+    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/source-grouped-narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

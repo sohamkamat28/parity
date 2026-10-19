@@ -6,7 +6,7 @@ Updated 19 October 2026. This is a tested development candidate, with remaining 
 
 - Automatic URL/instructions setup with optional reviewed extraction and local-model assistance, typed values, explicit periods, baseline activation and immutable rule revisions.
 - Independent capture and indexing pipelines, durable discovery/retries/leases, ownership fencing, real process interruption/recovery, idempotent publication and shared Chromium limits including previews.
-- Dashboard values/tables/lists, changed cells, comparable previous values, inline observed graphs with ranges, comparable deltas and evidence links, failed/stale/repair attention, persistent layout and immutable evidence.
+- Source-grouped dashboard overviews with compact collected-data trends and expandable details, values/tables/lists, changed cells, comparable previous values, inline observed graphs with ranges, comparable deltas and evidence links, failed/stale/repair attention, persistent layout and immutable evidence.
 - Editable automatic-setup schedules, reversible source removal/paused restore, explicit backed-up schema-4 upgrades, semantic HTML/JSON-LD discovery and bounded alternate-address connection attempts.
 - Paginated operational/history APIs and accurate global aggregates. Committed SSE supports reconnect IDs, reset after gaps, affected-widget refresh and polling fallback while retaining view state.
 - PostgreSQL hybrid retrieval, eligible exact filters, opt-in HNSW with eligible fallback, rebuildable projections and exclusion of old current versions while indexing is pending.

@@ -18,7 +18,7 @@ Choose Check every beside the instructions (seconds, minutes, hours or days), th
 
 Select All sources or one source. Explain Last checked, Last verified, Last changed and Next check separately. Pin a value, reorder/hide a widget, then reload to show that layout persists.
 
-For synthetic financial-style values, explicitly say they are test data. Show the unit and reporting period, the previous comparable value, table cell highlights and linked announcements. Open View evidence to inspect the immutable capture and extraction location. Use the inline graph ranges, focus a point and press Enter to inspect its capture, then expand Observation data. Open View history for the complete paginated observations; do not imply observations exist between checks.
+Start with All sources: point out each website’s name, check schedule and the fields grouped beneath it. Current values and small observed trend graphs are visible without opening anything. Expand Details & history for the full graph, table or announcements. For synthetic financial-style values, explicitly say they are test data. Show the unit and reporting period, the previous comparable value, table cell highlights and linked announcements. Open View evidence to inspect the immutable capture and extraction location. Use the inline graph ranges, focus a point and press Enter to inspect its capture, then expand Observation data. Open View history for the complete paginated observations; do not imply observations exist between checks.
 
 ## 3. Observe an automatic update
 
