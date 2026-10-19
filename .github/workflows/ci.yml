@@ -55,7 +55,7 @@ jobs:
           python-version: '3.14'
           cache: pip
       - run: python -m pip install -r requirements-test.txt -r requirements-postgres.txt
-      - run: python scripts/test.py tests/test_jobs.py tests/test_monitoring.py tests/test_v2_integration.py
+      - run: python scripts/test.py tests/test_jobs.py tests/test_monitoring.py tests/test_v2_integration.py tests/test_dashboard_upgrade.py
       - run: python -m playwright install --with-deps chromium
       - run: python scripts/browser_acceptance.py
       - uses: actions/upload-artifact@v4

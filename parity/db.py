@@ -15,7 +15,7 @@ sources = Table("sources", meta,
     Column("enabled", Boolean, default=True), Column("paused", Boolean, default=True),
     Column("generation", Integer, default=0), Column("lease_run", String),
     Column("lease_until", Float, default=0), Column("next_due", Float, default=0),
-    Column("created_at", Float, default=time.time))
+    Column("created_at", Float, default=time.time), Column("removed_at", Float))
 runs = Table("runs", meta,
     Column("id", String, primary_key=True), Column("source_id", ForeignKey("sources.id"), index=True),
     Column("status", String, nullable=False), Column("created_at", Float, default=time.time),
@@ -82,11 +82,11 @@ _legacy_session_records = Table("demo_sessions", meta,
 
 from . import monitor_schema, job_schema, search_schema
 _V3_TABLES = tuple(monitor_schema.register(meta).values()) + tuple(job_schema.register(meta).values()) + tuple(search_schema.register(meta).values())
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _V2_TABLES = (chat_conversations, chat_messages, _legacy_session_records)
 
 
-def migrate(connection):
+def migrate(connection,upgrade=False):
     """Apply additive migrations under the caller's transaction and schema lock.
 
     The original release wrote schema_version=1. Keeping that table means old
@@ -97,6 +97,8 @@ def migrate(connection):
     version = max(numbers, default=0)
     if version > SCHEMA_VERSION:
         raise RuntimeError("Database schema is newer than this Parity installation")
+    if version and version<SCHEMA_VERSION and not upgrade:
+        raise RuntimeError('Database upgrade required. Stop Parity, then run python scripts/database.py --upgrade to create a verified backup and apply the additive migration.')
     if version < 1:
         meta.create_all(connection, tables=[t for t in meta.sorted_tables if t not in (*_V2_TABLES,*_V3_TABLES)])
         connection.execute(schema.insert().values(number=1))
@@ -117,9 +119,44 @@ def migrate(connection):
             JOIN embedding_cache ec ON ch.cache_id=ec.id WHERE v.indexed_at IS NOT NULL''')
         connection.execute(schema.delete())
         connection.execute(schema.insert().values(number=3))
+        version = 3
+    if version == 3:
+        from sqlalchemy import inspect
+        if 'removed_at' not in {column['name'] for column in inspect(connection).get_columns('sources')}:
+            connection.exec_driver_sql('ALTER TABLE sources ADD COLUMN removed_at FLOAT')
+        monitor_schema.monitor_list_items.create(connection,checkfirst=True)
+        backfill_list_items(connection)
+        connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_monitor_series ON monitor_observations (monitor_id, field_id, at, id)')
+        connection.execute(schema.delete())
+        connection.execute(schema.insert().values(number=4))
+
+def backfill_list_items(connection):
+    from sqlalchemy import select,func
+    from .structured import fingerprint
+    if connection.dialect.name=='postgresql':
+        from sqlalchemy.dialects.postgresql import insert
+        is_list=func.json_typeof(monitor_schema.monitor_observations.c.value)=='array'
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+        is_list=func.json_type(monitor_schema.monitor_observations.c.value)=='array'
+    observations=monitor_schema.monitor_observations;items=monitor_schema.monitor_list_items
+    statement=select(observations.c.monitor_id,observations.c.field_id,observations.c.value,observations.c.at).where(
+        observations.c.status=='ok',is_list).order_by(observations.c.at,observations.c.id)
+    pending={}
+    def flush():
+        if pending:
+            connection.execute(insert(items).values(list(pending.values())).on_conflict_do_nothing(index_elements=['monitor_id','field_id','item_key']))
+            pending.clear()
+    for row in connection.execute(statement.execution_options(stream_results=True)).mappings():
+        for item in row['value']:
+            if not isinstance(item,dict) or 'key' not in item:continue
+            key=(row['monitor_id'],row['field_id'],fingerprint(str(item['key'])))
+            pending.setdefault(key,dict(monitor_id=key[0],field_id=key[1],item_key=key[2],first_observed_at=row['at']))
+            if len(pending)>=500:flush()
+    flush()
 
 class DB:
-    def __init__(self, url=None):
+    def __init__(self, url=None, *, upgrade=False):
         self.engine = create_engine(url or config.DATABASE_URL, pool_pre_ping=True,
             connect_args={"check_same_thread": False, "timeout": 30} if (url or config.DATABASE_URL).startswith("sqlite") else {})
         if self.engine.dialect.name == "sqlite":
@@ -133,7 +170,7 @@ class DB:
             if self.engine.dialect.name == "postgresql":
                 c.exec_driver_sql("SELECT pg_advisory_xact_lock(1936745081)")
                 c.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS vector")
-            migrate(c)
+            migrate(c,upgrade=upgrade)
             if self.engine.dialect.name == "postgresql":
                 c.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_chunks_fts ON chunks USING GIN (to_tsvector('simple', text))")
                 c.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_projection_fts ON search_projection USING GIN (to_tsvector('simple', text))")

@@ -56,7 +56,7 @@ async def local_guard(request:Request,call_next):
     return response
 
 @app.exception_handler(ValueError)
-async def value_error(request,error):return JSONResponse({'detail':str(error)},status_code=getattr(error,'status_code',400))
+async def value_error(request,error):return JSONResponse({'detail':str(error),'code':getattr(error,'code','invalid_request')},status_code=getattr(error,'status_code',400))
 
 class SessionIn(BaseModel):token:str=Field(min_length=1,max_length=500)
 class SourceIn(BaseModel):
@@ -112,6 +112,10 @@ def get_overview():return overview(service)
 def sources():return service.overview()['sources']
 @app.post('/api/sources')
 def add_source(body:SourceIn):return service.add_source(body.name,body.root_url,body.settings)
+@app.delete('/api/sources/{source_id}')
+def remove_source(source_id:str):return service.remove_source(source_id)
+@app.post('/api/sources/{source_id}/restore')
+def restore_source(source_id:str):return service.remove_source(source_id,restore=True)
 @app.post('/api/sources/test')
 def test_source(body:SourceIn):return service.test_source(body.name,body.root_url,body.settings)
 @app.patch('/api/sources/{source_id}')

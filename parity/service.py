@@ -44,7 +44,7 @@ class Service:
         if defaults['scope_mode'] not in ('page','section','site'):raise ValueError('Invalid scope_mode')
         for field,lo,hi in [("max_pages",1,500),("max_depth",0,6),("delay",0,60),
                             ("interval",10,604800),("missing_interval",0,604800),("max_bytes",1,10*1024*1024)]:
-            if not isinstance(defaults[field],(float,int)) or not lo<=defaults[field]<=hi:
+            if type(defaults[field]) not in (float,int) or not lo<=defaults[field]<=hi:
                 raise ValueError("Invalid "+field)
         for field in ("max_pages","max_depth","max_bytes"):
             if type(defaults[field]) is not int:raise ValueError(field+" must be an integer")
@@ -85,11 +85,17 @@ class Service:
 
     def update_source(self,source_id,name=None,settings=None,enabled=None,paused=None):
         current=self.source(source_id)
+        if current.get('removed_at') is not None:raise ValueError('Restore this source before changing its configuration.')
         if name is not None or settings is not None:
             if self.db.one(select(runs.c.id).where(runs.c.source_id==source_id,runs.c.status.in_(['queued','running']))):
                 raise ValueError('Wait for the active crawl before editing source rules')
             checked=self._prepare_source(name if name is not None else current['name'],current['root_url'],{**current['config'],**(settings or {})})
-            with self.db.tx() as c:c.execute(sources.update().where(sources.c.id==source_id).values(name=checked['name'],config=checked['config']))
+            with self.db.tx() as c:
+                values=dict(name=checked['name'],config=checked['config'])
+                if checked['config']['interval']!=current['config']['interval']:values['next_due']=time.time()+checked['config']['interval']
+                c.execute(sources.update().where(sources.c.id==source_id,sources.c.removed_at.is_(None)).values(**values))
+                from .monitor_schema import monitor_events
+                c.execute(monitor_events.insert().values(source_id=source_id,kind='source_updated',at=time.time(),detail={}))
         return self.set_source(source_id,enabled,paused) if enabled is not None or paused is not None else self.source(source_id)
 
     def test_source(self,name,root_url,settings=None):
@@ -552,7 +558,7 @@ class Service:
         return search(self,query,source_ids,limit,mode,as_of,include_unavailable)
 
     def overview(self):
-        return {"sources":self.db.all(select(sources).order_by(sources.c.created_at)),
+        return {"sources":self.db.all(select(sources).where(sources.c.removed_at.is_(None)).order_by(sources.c.created_at)),
                 "pages":self.db.all(select(pages).order_by(pages.c.title)),
                 "runs":self.db.all(select(runs).order_by(runs.c.created_at.desc()).limit(30)),
                 "changes":self.db.all(select(events, pages.c.title,pages.c.url).join(
@@ -583,9 +589,32 @@ class Service:
         with self.db.tx() as c:
             s=c.execute(select(sources).where(sources.c.id==source_id).with_for_update()).mappings().first()
             if not s:raise ValueError("SOURCE_NOT_FOUND")
+            if s['removed_at'] is not None:raise ValueError('Restore this source before resuming monitoring.')
             if enabled is False:
                 values.update(generation=s["generation"]+1,lease_until=0,lease_run=None)
                 c.execute(runs.update().where(runs.c.source_id==source_id,runs.c.status.in_(["queued","running"])).values(
                     status="cancelled",error="Source disabled",finished_at=time.time()))
             c.execute(sources.update().where(sources.c.id==source_id).values(**values))
+        return self.source(source_id)
+
+    def remove_source(self,source_id,restore=False):
+        """Retain evidence and atomically fence capture workers before hiding a source."""
+        from .job_schema import url_jobs
+        from .monitor_schema import monitor_events
+        now=time.time()
+        with self.db.tx() as c:
+            source=c.execute(select(sources).where(sources.c.id==source_id).with_for_update()).mappings().first()
+            if not source:raise ValueError('SOURCE_NOT_FOUND')
+            removed=source['removed_at'] is not None
+            if removed == (not restore):return dict(source)
+            values=dict(removed_at=None if restore else now,enabled=restore,paused=True,
+                        generation=source['generation']+1,lease_run=None,lease_until=0)
+            c.execute(sources.update().where(sources.c.id==source_id).values(**values))
+            if not restore:
+                c.execute(runs.update().where(runs.c.source_id==source_id,runs.c.status.in_(['queued','running'])).values(
+                    status='cancelled',error='Source removed; history retained',finished_at=now))
+                c.execute(url_jobs.update().where(url_jobs.c.source_id==source_id,url_jobs.c.status.in_(['queued','running'])).values(
+                    status='cancelled',owner=None,generation=url_jobs.c.generation+1,lease_until=0,
+                    finished_at=now,error='Source removed; history retained'))
+            c.execute(monitor_events.insert().values(source_id=source_id,kind='source_restored' if restore else 'source_removed',at=now,detail={}))
         return self.source(source_id)

@@ -12,13 +12,13 @@ Use the current verification report to describe what has been demonstrated. Keep
 
 Open Sources → Start monitoring. Enter a public URL and a clear name, then describe specific fields. Show the detected candidates and their actual values. Review the raw text, normalized unit, reporting period and location. Show that zero remains zero, and that a missing selector must be repaired or removed before activation.
 
-Click Start automatically after entering the URL and instructions. Show the dashboard without editing selectors, fields, rendering or widget types. Explain that Parity validates the values internally and uses cards, tables and lists based on their types. Repeat with AI unavailable to demonstrate deterministic detection. For optional customization, use Preview extraction or edit saved rules; latest-period selection remains explicit. New sources use one page, zero link depth and a 15-minute schedule; existing schedules are preserved.
+Choose Check every beside the instructions (seconds, minutes, hours or days), then click Start automatically. Show the dashboard without editing selectors, fields, rendering or widget types. Explain that Parity validates the values internally and chooses numeric graphs, tables and dated update lists based on their types. Repeat with AI unavailable to demonstrate deterministic detection. For optional customization, use Preview extraction or edit saved rules; latest-period selection remains explicit. New sources use one page, zero link depth and a 15-minute default schedule, which is editable before starting; existing schedules are preserved.
 
 ## 2. Read the dashboard
 
 Select All sources or one source. Explain Last checked, Last verified, Last changed and Next check separately. Pin a value, reorder/hide a widget, then reload to show that layout persists.
 
-For synthetic financial-style values, explicitly say they are test data. Show the unit and reporting period, the previous comparable value, table cell highlights and linked announcements. Open View evidence to inspect the immutable capture and extraction location. Open View history to inspect collected observations and a numeric chart; do not imply observations exist between checks.
+For synthetic financial-style values, explicitly say they are test data. Show the unit and reporting period, the previous comparable value, table cell highlights and linked announcements. Open View evidence to inspect the immutable capture and extraction location. Use the inline graph ranges, focus a point and press Enter to inspect its capture, then expand Observation data. Open View history for the complete paginated observations; do not imply observations exist between checks.
 
 ## 3. Observe an automatic update
 
@@ -51,3 +51,7 @@ Show backup verification output and the explicit migration command with a source
 Use the exact tables in `docs/VERIFICATION_REPORT.md` and `docs/verification/benchmark.json`. State the device, corpus, real vector counts, embedding reuse, one/five clients and measured ingestion scope. Distinguish first-client measurements from untested OS/database-cold cache behavior. Approximation remains opt-in; one synthetic corpus does not establish general capacity or retrieval quality.
 
 Conclude the demonstration by showing remaining untested Windows deployment checks and the pull request/source ZIP, rather than claiming unmeasured capacity or continuous cloud monitoring.
+
+## Remove and restore
+
+From Sources, remove a disposable source using the confirmation. Show that it disappears from the dashboard and current retrieval. Open Show → Removed sources; inspect retained documents/history and restore it. Explain that monitoring remains paused until explicitly resumed. The automated browser rehearsal performs this with isolated synthetic data.

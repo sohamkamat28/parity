@@ -1,0 +1,92 @@
+{
+  "mode": "history",
+  "device": {
+    "os": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "cpu": "arm64",
+    "python": "3.14.6"
+  },
+  "corpus": {
+    "fields": 40,
+    "observations_per_field": 500,
+    "total_observations": 20000,
+    "range_days": 7
+  },
+  "setup": {
+    "ms": 331.302,
+    "fetch_calls": 1
+  },
+  "dashboard": [
+    {
+      "ms": 11.7,
+      "sql_queries": 9,
+      "json_bytes": 52787
+    },
+    {
+      "ms": 10.227,
+      "sql_queries": 9,
+      "json_bytes": 52787
+    },
+    {
+      "ms": 9.468,
+      "sql_queries": 9,
+      "json_bytes": 52787
+    },
+    {
+      "ms": 9.337,
+      "sql_queries": 9,
+      "json_bytes": 52787
+    },
+    {
+      "ms": 9.279,
+      "sql_queries": 9,
+      "json_bytes": 52787
+    },
+    {
+      "ms": 9.053,
+      "sql_queries": 9,
+      "json_bytes": 52787
+    }
+  ],
+  "graphs": [
+    {
+      "ms": 167.362,
+      "sql_queries": 80,
+      "json_bytes": 4673733
+    },
+    {
+      "ms": 149.047,
+      "sql_queries": 80,
+      "json_bytes": 4673733
+    },
+    {
+      "ms": 148.717,
+      "sql_queries": 80,
+      "json_bytes": 4673733
+    },
+    {
+      "ms": 151.033,
+      "sql_queries": 80,
+      "json_bytes": 4673733
+    },
+    {
+      "ms": 152.782,
+      "sql_queries": 80,
+      "json_bytes": 4673733
+    },
+    {
+      "ms": 151.947,
+      "sql_queries": 80,
+      "json_bytes": 4673733
+    }
+  ],
+  "summary": {
+    "dashboard_warm_median_ms": 9.337,
+    "graphs_warm_median_ms": 151.033,
+    "graph_service_calls": 40
+  },
+  "notes": [
+    "First call and five repeats; OS/database caches are not flushed.",
+    "Baseline returns the newest 200 observations per field. Series samples the full requested range.",
+    "Timings exclude HTTP transport and browser rendering."
+  ]
+}

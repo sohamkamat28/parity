@@ -59,7 +59,7 @@ def create_router(service,chat):
     monitor=MonitorService(service);router=APIRouter()
 
     @router.get('/api/list/{kind}')
-    def listing(kind:str,source_id:str|None=None,cursor:str|None=None,limit:int=Query(50,ge=1,le=200),include_demo:bool=False,status:str|None=None,q:str|None=None,kind_filter:str|None=Query(None,alias='kind')):
+    def listing(kind:str,source_id:str|None=None,cursor:str|None=None,limit:int=Query(50,ge=1,le=200),include_demo:bool=False,status:str|None=None,q:str|None=None,kind_filter:str|None=Query(None,alias='kind'),removed:bool=False):
         if kind=='sources':
             table=sources;sort=sources.c.created_at;idcol=sources.c.id
             docs=select(func.count()).select_from(pages).where(pages.c.source_id==sources.c.id).correlate(sources).scalar_subquery()
@@ -81,6 +81,7 @@ def create_router(service,chat):
             table=monitor_changes;sort=table.c.at;idcol=table.c.id
             stmt=select(table,monitors.c.source_id).join(monitors,table.c.monitor_id==monitors.c.id).join(sources,monitors.c.source_id==sources.c.id)
         else:raise HTTPException(404,'Unknown list')
+        if kind=='sources':stmt=stmt.where(sources.c.removed_at.is_not(None) if removed else sources.c.removed_at.is_(None))
         if source_id:stmt=stmt.where(sources.c.id==source_id)
         if q:
             needle=q[:200].replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
@@ -127,6 +128,18 @@ def create_router(service,chat):
     @router.get('/api/dashboard/widgets')
     def widgets(monitor_ids:list[str]=Query(min_length=1,max_length=100),source_id:str|None=None,include_demo:bool=False):
         return monitor.dashboard(source_id,include_demo,100,monitor_ids=monitor_ids)
+    @router.get('/api/dashboard/series')
+    def read_dashboard_series(fields:list[str]=Query(min_length=1,max_length=50),start:float|None=None,end:float|None=None):
+        from .series import dashboard_series
+        if any(len(field)>400 for field in fields):raise ValueError('Invalid series identity.')
+        payload={'fields':[json.loads(field) for field in fields]}
+        if start is not None:payload['start']=start
+        if end is not None:payload['end']=end
+        return dashboard_series(service,payload)
+    @router.post('/api/dashboard/series')
+    def dashboard_series(body:dict):
+        from .series import dashboard_series
+        return dashboard_series(service,body)
     @router.get('/api/dashboard/layout')
     def get_layout():return monitor.layout()
     @router.put('/api/dashboard/layout')

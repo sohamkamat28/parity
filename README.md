@@ -1,8 +1,8 @@
 # Parity 2.0
 
-Website monitoring, immutable evidence, version history and free local AI chat. Track reviewed fields on public HTML pages and inspect their changes without asking chat. PDF extraction, document search, REST, CLI and all five MCP tools remain available.
+Website monitoring, immutable evidence, version history and free local AI chat. Track fields on public HTML/JavaScript pages, choose a check frequency, and inspect collected values and inline graphs without asking chat. PDF extraction, document search, REST, CLI and all five MCP tools remain available.
 
-**Development candidate, 18 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks.
+**Development candidate, 19 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks.
 
 ## Fresh Windows installation
 
@@ -26,6 +26,10 @@ A monitoring-only setup can omit models, and browser support can be omitted for 
 ```
 
 SQLite is an explicit compatibility profile: `setup.bat -Profile sqlite`, then `start.bat --profile sqlite`. PostgreSQL/pgvector is the default. Monitoring runs while the services run, even with the browser tab closed; it stops when the device or services stop.
+
+## Upgrading an existing installation
+
+Stop Parity first. Schema 4 adds reversible source removal and announcement first-observed metadata; it retains existing histories. Older databases require an explicit upgrade. Using the project Python environment, run `python scripts/database.py --upgrade` (add `--profile sqlite` for that compatibility profile). This creates and verifies a backup before applying the additive migration. Keep the backup. Fresh empty databases initialize normally.
 
 ## macOS development
 

@@ -1,12 +1,13 @@
 # Parity 2.0 implementation status
 
-Updated 18 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
+Updated 19 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
 
 ## Implemented and exercised
 
 - Automatic URL/instructions setup with optional reviewed extraction and local-model assistance, typed values, explicit periods, baseline activation and immutable rule revisions.
 - Independent capture and indexing pipelines, durable discovery/retries/leases, ownership fencing, real process interruption/recovery, idempotent publication and shared Chromium limits including previews.
-- Dashboard values/tables/lists, changed cells, comparable previous values, observed history charts, failed/stale/repair attention, persistent layout and immutable evidence.
+- Dashboard values/tables/lists, changed cells, comparable previous values, inline observed graphs with ranges, comparable deltas and evidence links, failed/stale/repair attention, persistent layout and immutable evidence.
+- Editable automatic-setup schedules, reversible source removal/paused restore, explicit backed-up schema-4 upgrades, semantic HTML/JSON-LD discovery and bounded alternate-address connection attempts.
 - Paginated operational/history APIs and accurate global aggregates. Committed SSE supports reconnect IDs, reset after gaps, affected-widget refresh and polling fallback while retaining view state.
 - PostgreSQL hybrid retrieval, eligible exact filters, opt-in HNSW with eligible fallback, rebuildable projections and exclusion of old current versions while indexing is pending.
 - Free native Qwen chat, one shared authenticated MiniLM process, retained conversations, immutable monitor/document citations and server-side comparable calculations.
@@ -16,7 +17,7 @@ Updated 18 October 2026. This is a tested development candidate, with remaining 
 
 ## Verification
 
-The local combined suite passed **134 tests**, with **3 intentional SQLite skips for PostgreSQL-only cases** that passed on PostgreSQL. Production frontend build, dependency compatibility and compile checks pass. The complete macOS setup entry point also completed against a separate empty development database with verified cached model/runtime/browser assets. Browser rehearsals passed with models stopped and enabled, including automatic updates, polling fallback, failed-check recovery, narrow/keyboard navigation and monitoring after tab closure. Public scalar/list/table extraction passed on accessible pages.
+The local combined suite passed **165 tests**, with **4 intentional profile skips**: three existing PostgreSQL-only checks and the new row-lock race case skip on SQLite and pass on PostgreSQL. Production frontend build, dependency compatibility and compile checks pass. The complete macOS setup entry point also completed against a separate empty development database with verified cached model/runtime/browser assets. Browser rehearsals passed with models stopped and enabled, including automatic updates, polling fallback, failed-check recovery, narrow/keyboard navigation and monitoring after tab closure. Public scalar/list/table extraction passed on accessible pages.
 
 Windows and Ubuntu backend, PostgreSQL integration and frontend checks passed on [the corrected CI run](https://github.com/sohamkamat28/parity/actions/runs/39095600869). Subsequent branch runs add the full PostgreSQL browser rehearsal and final integration checks; see [current CI runs](https://github.com/sohamkamat28/parity/actions).
 

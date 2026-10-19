@@ -11,11 +11,12 @@ def retrieve(service,query,source_ids=None,mode='current',as_of=None,limit=8):
     cols=[o,r.c.fields,r.c.number,m.c.name.label('monitor_name'),sources.c.name.label('source_name'),
           sources.c.id.label('source_id'),sources.c.config]
     stmt=select(*cols).select_from(o.join(r,o.c.revision_id==r.c.id).join(m,o.c.monitor_id==m.c.id)
-        .join(sources,m.c.source_id==sources.c.id)).where(sources.c.enabled.is_(True),o.c.status=='ok',o.c.capture_id.is_not(None))
+        .join(sources,m.c.source_id==sources.c.id)).where(or_(sources.c.enabled.is_(True), sources.c.removed_at.is_not(None)),o.c.status=='ok',o.c.capture_id.is_not(None))
     if source_ids is not None:stmt=stmt.where(sources.c.id.in_(source_ids))
     else:stmt=stmt.where(sources.c.config['demo'].as_boolean().is_not(True),
         func.coalesce(sources.c.config['source_kind'].as_string(),'normal')=='normal')
     if mode=='current':
+        stmt=stmt.where(sources.c.removed_at.is_(None),sources.c.enabled.is_(True))
         stmt=stmt.join(monitor_field_states,and_(monitor_field_states.c.observation_id==o.c.id,
             monitor_field_states.c.revision_id==m.c.revision_id)).add_columns(
             monitor_field_states.c.status.label('current_status'),monitor_field_states.c.error.label('current_error'),

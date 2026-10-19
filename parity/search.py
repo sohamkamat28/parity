@@ -34,13 +34,13 @@ def postgres_search(service,query,qvec,model,source_ids,limit,mode,as_of,include
         projection.c.version_id,versions.c.number,versions.c.title,versions.c.observed_at,versions.c.indexed_at,
         projection.c.page_id,pages.c.url,pages.c.availability,pages.c.health,pages.c.verified_at,pages.c.checked_at,
         pages.c.last_error,projection.c.source_id,sources.c.name.label('source_name'),sources.c.config,
-        projection.c.vector).select_from(base).where(sources.c.enabled.is_(True),pages.c.health!='blocked',
+        projection.c.vector).select_from(base).where(or_(sources.c.enabled.is_(True),and_(sources.c.removed_at.is_not(None),mode=='as_of')),pages.c.health!='blocked',
             versions.c.indexed_at.is_not(None),projection.c.model_signature==model.signature)
     if source_ids is not None:stmt=stmt.where(sources.c.id.in_(source_ids))
     else:stmt=stmt.where(sources.c.config['demo'].as_boolean().is_not(True),
                          func.coalesce(sources.c.config['source_kind'].as_string(),'normal')=='normal')
     if mode=='current':
-        stmt=stmt.where(versions.c.id==pages.c.current_id)
+        stmt=stmt.where(sources.c.removed_at.is_(None),versions.c.id==pages.c.current_id)
         if not include_unavailable:stmt=stmt.where(pages.c.availability=='active')
     else:
         stmt=stmt.where(select(intervals.c.id).where(intervals.c.version_id==versions.c.id,
@@ -118,13 +118,13 @@ def search(service,query,source_ids=None,limit=5,mode="current",as_of=None,inclu
         versions.c.indexed_at,pages.c.id.label("page_id"),pages.c.url,pages.c.availability,pages.c.health,
         pages.c.verified_at,pages.c.checked_at,pages.c.last_error,sources.c.id.label("source_id"),
         sources.c.name.label("source_name"),sources.c.config,cache.c.vector).select_from(base).where(
-            sources.c.enabled.is_(True),cache.c.signature==model.signature,pages.c.health!="blocked")
+            or_(sources.c.enabled.is_(True),and_(sources.c.removed_at.is_not(None),mode=='as_of')),cache.c.signature==model.signature,pages.c.health!="blocked")
     if source_ids is not None:stmt=stmt.where(sources.c.id.in_(source_ids))
     else:stmt=stmt.where(sources.c.config['demo'].as_boolean().is_not(True),
                          func.coalesce(sources.c.config['source_kind'].as_string(),'normal')=='normal')
     stmt=stmt.where(versions.c.indexed_at.is_not(None))
     if mode=="current":
-        stmt=stmt.where(versions.c.id==pages.c.current_id)
+        stmt=stmt.where(sources.c.removed_at.is_(None),versions.c.id==pages.c.current_id)
         if not include_unavailable:stmt=stmt.where(pages.c.availability=="active")
     else:
         stmt=stmt.join(intervals,and_(intervals.c.version_id==versions.c.id,intervals.c.page_id==pages.c.id))

@@ -16,7 +16,7 @@ import zipfile
 from contextlib import closing
 from sqlalchemy import create_engine,select,func,inspect,text
 from sqlalchemy.pool import NullPool
-from .db import DB,meta,SCHEMA_VERSION
+from .db import DB,meta,SCHEMA_VERSION,backfill_list_items
 
 FORMAT=1
 
@@ -116,8 +116,8 @@ def backup_database(database_url,data_dir,destination):
                     for table in meta.sorted_tables:
                         if table.name not in available:continue
                         checksum=hashlib.sha256();count=0
-                        columns=list(table.columns.keys())
-                        statement=select(table).order_by(*table.primary_key.columns)
+                        columns=[column['name'] for column in inspect(connection).get_columns(table.name)]
+                        statement=select(*(table.c[name] for name in columns)).order_by(*table.primary_key.columns)
                         with archive.open('tables/'+table.name+'.jsonl','w',force_zip64=True) as output:
                             rows=connection.execution_options(stream_results=True).execute(statement).mappings()
                             for row in rows:
@@ -172,7 +172,7 @@ def verify_backup(path):
 
 def _verify_table(connection,table,expected):
     checksum=hashlib.sha256();count=0
-    for row in connection.execute(select(table).order_by(*table.primary_key.columns)).mappings():
+    for row in connection.execute(select(*(table.c[name] for name in expected['columns'])).order_by(*table.primary_key.columns)).mappings():
         checksum.update(_line(row));count+=1
     if count!=expected['count'] or checksum.hexdigest()!=expected['sha256']:
         raise ValueError('Restored table verification failed: '+table.name)
@@ -217,6 +217,7 @@ def restore_database(archive_path,target_url,target_data):
                         SELECT ch.id,p.source_id,p.id,v.id,ch.text,ch.heading,ch.locator,ec.signature,ec.vector
                         FROM chunks ch JOIN versions v ON ch.version_id=v.id JOIN pages p ON v.page_id=p.id
                         JOIN embedding_cache ec ON ch.cache_id=ec.id WHERE v.indexed_at IS NOT NULL''')
+                if 'monitor_list_items' not in manifest['tables']:backfill_list_items(connection)
                 _reset_runtime(connection)
                 if database.engine.dialect.name=='postgresql':
                     # Restore explicitly supplied event IDs before repairing SERIAL sequences.

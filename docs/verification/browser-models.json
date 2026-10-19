@@ -3,7 +3,9 @@
   "checks": [
     "Settings UI, retired sample endpoints and legacy static app are absent",
     "Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps",
+    "Frequency entered during automatic setup is saved; later schedule edits persist",
     "Dashboard zero/currency/table/list rendering and normal source inclusion with PostgreSQL",
+    "Inline time-series, ranges, keyboard evidence links, accessible data table and first-observed announcement dates",
     "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
     "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
     "Failed HTTP check retains previous verified value and warning; next successful check recovers",
@@ -11,11 +13,12 @@
     "390px layout, keyboard navigation, focus management and reduced-motion setting",
     "Scheduled monitoring continues with browser tab closed; layout persists",
     "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation",
-    "Native free Qwen chat selects immutable evidence with shared MiniLM available"
+    "Native free Qwen chat selects immutable evidence with shared MiniLM available",
+    "Remove/restore UI retains immutable evidence, hides active source and restores with monitoring paused"
   ],
   "screenshots": [
-    "outputs/runtime/browser-83eda3f7d3334c0ca69c7759f30f1d16/desktop.png",
-    "outputs/runtime/browser-83eda3f7d3334c0ca69c7759f30f1d16/narrow.png"
+    "outputs/runtime/browser-7ed887f620e546149803731b04b20178/desktop.png",
+    "outputs/runtime/browser-7ed887f620e546149803731b04b20178/narrow.png"
   ],
   "console_errors": [],
   "status": "passed"

@@ -50,6 +50,7 @@ class MonitorService:
     def _validated_fields(self, fields, body, url):
         if not isinstance(fields, list) or len(fields) > MAX_FIELDS:
             raise ValueError(f'Select between 1 and {MAX_FIELDS} fields.')
+        body = body if hasattr(body,'select') else soup_for(body)
         results, seen = [], set()
         for original in fields:
             if not isinstance(original, dict):
@@ -116,6 +117,8 @@ class MonitorService:
             source_id = payload.get('source_id')
             current = self.service.source(source_id) if source_id else None
             root = payload.get('root_url') or (current['root_url'] if current else '')
+            if current and current.get('removed_at') is not None:
+                raise ValueError('Restore this source before adding monitoring rules.')
             if current and canonical(root) != canonical(current['root_url']):
                 raise ValueError('Add a separate source to monitor a different website URL.')
             settings = dict(current['config']) if current else {'max_pages': 1, 'max_depth': 0, 'interval': 900, 'scope_mode': 'page', 'allow': [urlsplit(root).path or '/']}
@@ -129,7 +132,8 @@ class MonitorService:
             else:
                 response = self.service.fetcher.get(source['root_url'], source)
             if response.status != 200:
-                raise ValueError(f'The website returned {response.status}. Check the URL and try again.')
+                from .fetch import FetchError
+                raise FetchError(f'The website returned HTTP {response.status}. '+('Access is restricted; try a public page that opens on this device.' if response.status in (401,403) else 'Check the URL and try again.'),code='access_blocked' if response.status in (401,403) else 'http_error',transient=response.status in (429,500,502,503,504),response=response)
             if 'pdf' in response.headers.get('content-type', '').lower():
                 raise ValueError('Structured monitoring currently supports HTML pages. PDF search and citations remain available through Sources.')
             capture = self._capture(source_id, 'preview-'+uid(), response)
@@ -193,6 +197,22 @@ class MonitorService:
             raise ValueError('Parity could not identify the requested information in this page, including its rendered content. '
                              'Try a more specific description or a direct page containing the value. Monitoring has not been started.')
         result['fields'] = [field for field in result['fields'] if field['valid']]
+        if re.search(r'\b(?:current price|cost)\b',request['instructions'],re.I):
+            prices=[f for f in result['fields'] if f['type'] in ('number','currency') and re.search(r'price|cost',f['name'],re.I)]
+            terms=set(re.findall(r'[a-z0-9]+',request['instructions'].casefold()))-{'track','the','current','price','cost','of','and','monitor'}
+            if prices and terms:
+                scores=[len(terms & set(re.findall(r'[a-z0-9]+',f['name'].casefold()))) for f in prices]
+                best=max(scores)
+                if best:prices=[f for f,score in zip(prices,scores) if score==best]
+            values={(str(f['preview']['value']),f['preview'].get('unit'),f['preview'].get('period')) for f in prices}
+            entities={f['rule']['entity'] for f in prices if f['rule']['kind']=='json_ld'}
+            if len(values)>1 or len(entities)>1:
+                from .fetch import FetchError
+                raise FetchError('Multiple prices or products match this description. Include the product or offer name, or review the extraction preview. Monitoring has not been started.',code='ambiguous_fields',transient=False)
+            if prices:
+                selected=prices[0]
+                price_ids={f['id'] for f in result['fields'] if f['type'] in ('number','currency') and re.search(r'price|cost',f['name'],re.I)}
+                result['fields']=[f for f in result['fields'] if f['id'] not in price_ids or f['id']==selected['id']]
         result['message'] = 'Extraction validated. Ready to create dashboard widgets automatically.'
         return result
 
@@ -209,7 +229,8 @@ class MonitorService:
             monitor = self.monitor(draft['activated_id'])
             return {'monitor': monitor, 'source': self.service.source(monitor['source_id']), 'run': None}
         capture = self.db.one(select(schema.monitor_captures).where(schema.monitor_captures.c.id == draft['capture_id']))
-        fields = self._validated_fields(payload.get('fields', draft['fields']), self._body(capture), capture['url'])
+        parsed=soup_for(self._body(capture))
+        fields = self._validated_fields(payload.get('fields', draft['fields']), parsed, capture['url'])
         enabled = [field for field in fields if field['enabled']]
         if not enabled:
             raise ValueError('Select at least one field to monitor.')
@@ -230,6 +251,9 @@ class MonitorService:
         monitor = {'id': monitor_id, 'source_id': source['id'], 'name': clean(payload.get('name') or source['name'])[:120], 'instructions': clean(payload.get('instructions', draft['instructions']))[:4000], 'revision_id': revision_id, 'paused': False, 'created_at': old['created_at'] if old else now, 'updated_at': now}
         revision = {'id': revision_id, 'monitor_id': monitor_id, 'number': old['revision_number']+1 if old else 1, 'fields': saved_fields, 'root_url': capture['url'], 'created_at': now}
         with self.db.tx() as connection:
+            if draft['source_id']:
+                current=connection.execute(select(sources).where(sources.c.id==draft['source_id']).with_for_update()).mappings().first()
+                if not current or current['removed_at'] is not None:raise ValueError('Restore this source before activating monitoring.')
             locked_draft = connection.execute(select(schema.monitor_drafts).where(schema.monitor_drafts.c.id == draft['id']).with_for_update()).mappings().first()
             if locked_draft['activated_id']:
                 raise ValueError('This preview was already activated. Refresh the monitor list.')
@@ -249,7 +273,7 @@ class MonitorService:
             connection.execute(schema.monitor_drafts.update().where(schema.monitor_drafts.c.id == draft['id']).values(activated_id=monitor_id))
             connection.execute(schema.monitor_captures.update().where(schema.monitor_captures.c.id == capture['id']).values(source_id=source['id']))
             self._publish(connection, source, 'baseline:'+revision_id, capture, revision, saved_fields,
-                          {field['id']: extract_field(self._body(capture), field, capture['url']) for field in saved_fields}, None, 'rule_revision' if old else 'baseline')
+                          {field['id']: extract_field(parsed, field, capture['url']) for field in saved_fields}, None, 'rule_revision' if old else 'baseline')
         run = self.service.enqueue(source['id'])
         return {'monitor': self.monitor(monitor_id), 'source': self.service.source(source['id']), 'run': run}
 
@@ -267,7 +291,9 @@ class MonitorService:
         return row | {'fields': revision['fields'], 'revision_number': revision['number'], 'root_url': revision['root_url']}
 
     def list_monitors(self, source_id=None, limit=50, cursor=None):
+        from .db import sources
         query = select(schema.monitors)
+        if not source_id:query=query.join(sources,sources.c.id==schema.monitors.c.source_id).where(sources.c.removed_at.is_(None))
         if source_id:
             query = query.where(schema.monitors.c.source_id == source_id)
         total = self.db.one(select(func.count().label('total')).select_from(query.subquery()))['total']
@@ -280,6 +306,8 @@ class MonitorService:
         from .db import sources
         monitor = self.monitor(monitor_id)
         with self.db.tx() as connection:
+            source=connection.execute(select(sources).where(sources.c.id==monitor['source_id']).with_for_update()).mappings().one()
+            if source['removed_at'] is not None:raise ValueError('Restore this source before resuming monitoring.')
             connection.execute(schema.monitors.update().where(schema.monitors.c.id == monitor_id).values(paused=bool(paused), updated_at=time.time()))
             active_count = connection.execute(select(func.count()).select_from(schema.monitors).where(schema.monitors.c.source_id == monitor['source_id'], schema.monitors.c.paused.is_(False))).scalar()
             connection.execute(sources.update().where(sources.c.id == monitor['source_id']).values(paused=not bool(active_count)))
@@ -371,6 +399,15 @@ class MonitorService:
             state_id = fingerprint([revision_id, field['id']])[:32]
             previous = connection.execute(select(schema.monitor_field_states).where(schema.monitor_field_states.c.id == state_id).with_for_update()).mappings().first()
             result = results[field['id']]
+            if field['type']=='list' and isinstance(result.get('value'),list):
+                items=schema.monitor_list_items
+                if self.db.engine.dialect.name=='postgresql':
+                    from sqlalchemy.dialects.postgresql import insert
+                else:
+                    from sqlalchemy.dialects.sqlite import insert
+                if result['value']:
+                    statement=insert(items).values([dict(monitor_id=monitor_id,field_id=field['id'],item_key=fingerprint(str(item['key'])),first_observed_at=at) for item in result['value']])
+                    connection.execute(statement.on_conflict_do_update(index_elements=['monitor_id','field_id','item_key'],set_={'first_observed_at':func.min(items.c.first_observed_at,at) if self.db.engine.dialect.name=='sqlite' else func.least(items.c.first_observed_at,at)}))
             status = result.get('status', 'ok')
             valid = status == 'ok'
             previous_valid = previous and previous['last_verified_at'] is not None
@@ -406,7 +443,7 @@ class MonitorService:
     def dashboard(self, source_id=None, include_demo=False, limit=50, cursor=None, monitor_ids=None):
         from .db import sources
         limit = min(100, max(1, int(limit)))
-        query = select(schema.monitors, sources.c.name.label('source_name'), sources.c.config.label('source_config'), sources.c.next_due, sources.c.paused.label('source_paused'), sources.c.enabled.label('source_enabled'), sources.c.root_url.label('source_root_url'), sources.c.created_at.label('source_created_at')).join(sources, sources.c.id == schema.monitors.c.source_id)
+        query = select(schema.monitors, sources.c.name.label('source_name'), sources.c.config.label('source_config'), sources.c.next_due, sources.c.paused.label('source_paused'), sources.c.enabled.label('source_enabled'), sources.c.root_url.label('source_root_url'), sources.c.created_at.label('source_created_at')).join(sources, sources.c.id == schema.monitors.c.source_id).where(sources.c.removed_at.is_(None))
         if source_id:
             query = query.where(schema.monitors.c.source_id == source_id)
         if not include_demo:
@@ -436,12 +473,22 @@ class MonitorService:
         latest_changes = {(r['revision_id'], r['field_id']): r for r in self.db.all(select(ranked).where(ranked.c.position == 1))} if revision_ids else {}
         before_ids = [r['previous_observation_id'] for r in latest_changes.values() if r['previous_observation_id']]
         before = {r['id']: r for r in self.db.all(select(schema.monitor_observations).where(schema.monitor_observations.c.id.in_(before_ids)))} if before_ids else {}
+        list_keys=[(state['monitor_id'],state['field_id'],fingerprint(str(item['key']))) for state in states.values() if isinstance(state.get('value'),list) for item in state['value'] if isinstance(item,dict) and 'key' in item]
+        first_seen={}
+        if list_keys:
+            from sqlalchemy import tuple_
+            t=schema.monitor_list_items
+            for offset in range(0,len(list_keys),500):
+                for item in self.db.all(select(t).where(tuple_(t.c.monitor_id,t.c.field_id,t.c.item_key).in_(list_keys[offset:offset+500]))):
+                    first_seen[(item['monitor_id'],item['field_id'],item['item_key'])]=item['first_observed_at']
         monitors, widgets, attention, source_list = [], [], [], {}
         for row in rows:
             fields = []
             for definition in revisions[row['revision_id']]['fields']:
                 state = states.get((row['revision_id'], definition['id']), {})
                 field = {**definition, **{key: state.get(key) for key in ('value', 'raw_text', 'unit', 'period', 'locator', 'capture_id', 'last_checked_at', 'last_verified_at', 'last_changed_at', 'error')}, 'status': state.get('status', 'pending'), 'monitor_id': row['id'], 'source_id': row['source_id'], 'source_name': row['source_name']}
+                if definition['type']=='list' and isinstance(field.get('value'),list):
+                    field['value']=[{**item,'first_observed_at':first_seen.get((row['id'],definition['id'],fingerprint(str(item['key']))))} for item in field['value']]
                 field['observation_id'] = state.get('observation_id')
                 change = latest_changes.get((row['revision_id'], definition['id']))
                 if change:
@@ -450,6 +497,14 @@ class MonitorService:
                     if previous and previous['unit'] == field['unit'] and previous['period'] == field['period']:
                         field['previous_value'] = previous['value']
                         field['previous_period'] = previous['period']
+                        if definition['type'] in ('number','currency','percentage'):
+                            from decimal import Decimal,InvalidOperation
+                            try:
+                                old_value,new_value=Decimal(str(previous['value'])),Decimal(str(field['value']))
+                                if old_value.is_finite() and new_value.is_finite():
+                                    delta=new_value-old_value
+                                    field['comparison']={'delta':str(delta),'percent':str((delta/abs(old_value)*100).quantize(Decimal('.01'))) if old_value else None}
+                            except (InvalidOperation,ValueError,TypeError):pass
                 if field['status'] == 'ok' and (field['last_verified_at'] or 0) < time.time()-row['source_config']['interval']:
                     field.update(status='stale', error='Verification is older than the check interval. Check that Parity services are running.')
                 if field['status'] not in ('ok', 'pending'):

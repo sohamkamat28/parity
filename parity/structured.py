@@ -23,7 +23,7 @@ def fingerprint(value):
 def soup_for(body):
     soup = BeautifulSoup(body, 'html.parser')
     for node in soup.select('script,style,noscript,template,iframe,object,svg,[hidden],[aria-hidden="true"]'):
-        node.decompose()
+        if node.name!='script' or node.get('type','').lower()!='application/ld+json':node.decompose()
     return soup
 
 
@@ -153,22 +153,69 @@ def table_data(table):
     return {'headers': headers, 'rows': result, 'unit': unit, 'context': context.strip()}
 
 
+def json_entities(soup):
+    """Read bounded schema.org objects without evaluating scripts or following URLs."""
+    cached=soup.__dict__.get('_parity_json_entities')
+    if cached is not None:return cached
+    found=[];visited=0
+    def walk(node,depth=0):
+        nonlocal visited
+        visited+=1
+        if visited>1000 or depth>12:return
+        if isinstance(node,list):
+            for child in node[:200]:walk(child,depth+1)
+        elif isinstance(node,dict):
+            kind=node.get('@type',[]);kind=kind if isinstance(kind,list) else [kind]
+            if any(str(t).split('/')[-1] in ('Product','Offer','AggregateOffer') for t in kind):
+                identity=next((key+':'+str(node[key]) for key in ('@id','sku','productID','url','name') if isinstance(node.get(key),(str,int)) and str(node[key]).strip()),None)
+                if identity:found.append((identity,node))
+            for child in list(node.values())[:100]:
+                if isinstance(child,(dict,list)):walk(child,depth+1)
+    size=0
+    for script in soup.select('script[type="application/ld+json"]')[:16]:
+        raw=script.string or '';size+=len(raw)
+        if size>262144:break
+        try:walk(json.loads(raw))
+        except (ValueError,RecursionError):continue
+    soup.__dict__['_parity_json_entities']=found
+    return found
+
+
+def json_path(node,path):
+    for part in path:
+        if part=='__single__':
+            if not isinstance(node,list) or len(node)!=1:raise LookupError('Structured data now contains multiple offers. Review this field.')
+            node=node[0]
+        elif isinstance(node,dict) and part in node:node=node[part]
+        else:raise LookupError('The saved structured-data property is missing.')
+    if not isinstance(node,(str,int,float)) or isinstance(node,bool):raise ValueError('The structured-data property is not a scalar value.')
+    return node
+
+
 def validate_rule(rule):
-    if not isinstance(rule, dict) or rule.get('kind') not in ('scalar', 'label_value', 'table', 'table_cell', 'list'):
+    if not isinstance(rule, dict) or rule.get('kind') not in ('scalar', 'label_value', 'table', 'table_cell', 'list', 'json_ld'):
         raise ValueError('Select a supported extraction rule.')
+    if rule['kind']=='json_ld':
+        if not isinstance(rule.get('entity'),str) or len(rule['entity'])>2000:raise ValueError('A stable structured-data entity is required.')
+        for key in ('path','unit_path'):
+            path=rule.get(key,[])
+            if not isinstance(path,list) or (key=='path' and not path) or len(path)>8 or any(not isinstance(p,str) or not p or len(p)>100 for p in path):raise ValueError('Invalid structured-data property path.')
+        return
     selector = rule.get('selector')
     if not isinstance(selector, str) or not selector or len(selector) > 1500:
         raise ValueError('A valid content selector is required.')
     try:
         soupsieve.compile(selector)
-        for key in ('item_selector', 'value_selector'):
+        for key in ('item_selector', 'value_selector','unit_selector'):
             if rule.get(key):
+                if not isinstance(rule[key],str) or len(rule[key])>1500:raise ValueError('Invalid auxiliary selector.')
                 soupsieve.compile(rule[key])
     except Exception as error:
         raise ValueError('The CSS selector is invalid.') from error
     attr = rule.get('attribute')
     if attr and attr not in ('href', 'title', 'datetime', 'content', 'value', 'aria-label') and not re.fullmatch(r'data-[a-z0-9_-]+', attr):
         raise ValueError('The selected attribute is unsupported.')
+    if rule.get('unit_attribute') not in (None,'content','value','aria-label'):raise ValueError('Unsupported unit attribute.')
     if rule.get('period_mode', 'fixed') not in ('fixed', 'latest'):
         raise ValueError('Choose a fixed or latest reporting period.')
 
@@ -182,6 +229,15 @@ def extract_field(body, field, url):
     if (kind == 'table') != (rule['kind'] == 'table') or (kind == 'list') != (rule['kind'] == 'list'):
         raise ValueError('Table and repeating-list fields require their matching extraction rule.')
     soup = body if isinstance(body, BeautifulSoup) else soup_for(body)
+    if rule['kind']=='json_ld':
+        entities=[node for identity,node in json_entities(soup) if identity==rule['entity']]
+        if len(entities)!=1:raise LookupError('The saved structured-data entity is missing or ambiguous.')
+        raw=clean(json_path(entities[0],rule['path']))
+        unit=clean(json_path(entities[0],rule['unit_path'])) if rule.get('unit_path') else rule.get('unit','')
+        value,unit=normalize(raw,kind,unit,rule.get('date_format'))
+        period=rule.get('period','')
+        return dict(value=value,raw_text=raw,unit=unit,period=period,locator='JSON-LD / '+rule['entity']+' / '+'.'.join(rule['path']),
+                    fingerprint=fingerprint(dict(type=kind,value=value,unit=unit,period=period)))
     matches = soup.select(rule['selector'])
     if rule['kind'] == 'label_value':
         label = clean(rule.get('label')).casefold()
@@ -193,6 +249,11 @@ def extract_field(body, field, url):
     node = matches[0]
     locator = rule['selector']
     period, unit = rule.get('period') or '', rule.get('unit') or ''
+    if rule.get('unit_selector'):
+        units=soup.select(rule['unit_selector'])
+        if len(units)!=1:raise LookupError('The saved currency or unit location is missing or ambiguous.')
+        unit=clean(units[0].get(rule['unit_attribute'],'')) if rule.get('unit_attribute') else clean(units[0].get_text(' ',strip=True))
+        if not unit:raise ValueError('The currency or unit is empty.')
     if rule['kind'] in ('table', 'table_cell'):
         value = table_data(node)
         unit = unit or value['unit']
@@ -270,6 +331,36 @@ def discover(body, url):
         except (ValueError, LookupError) as error:
             item.update(preview=None, valid=False, error=str(error))
         candidates.append(item)
+    for identity,entity in json_entities(soup):
+        name=clean(entity.get('name') or 'Product')
+        paths=[]
+        if 'price' in entity:paths.append((['price'],['priceCurrency']))
+        offers=entity.get('offers')
+        if isinstance(offers,dict) and 'price' in offers:paths.append((['offers','price'],['offers','priceCurrency']))
+        if isinstance(offers,list) and len(offers)==1 and isinstance(offers[0],dict) and 'price' in offers[0]:paths.append((['offers','__single__','price'],['offers','__single__','priceCurrency']))
+        for path,unit_path in paths:
+            try:json_path(entity,unit_path)
+            except (ValueError,LookupError):unit_path=[]
+            add('Current price — '+name,'currency' if unit_path else 'number',dict(kind='json_ld',selector='script[type="application/ld+json"]',entity=identity,path=path,unit_path=unit_path))
+    for node in soup.select('[aria-label], [aria-labelledby], [itemprop], [data-label]')[:250]:
+        if node.find_parent(['nav','footer','header']):continue
+        label=clean(node.get('data-label') or node.get('aria-label'))
+        if node.get('aria-labelledby'):
+            label=clean(' '.join(ref.get_text(' ',strip=True) for ident in node['aria-labelledby'].split() if (ref:=soup.find(id=ident))))
+        prop=node.get('itemprop','')
+        if not label and prop:label='Current price' if prop=='price' else prop
+        attribute='content' if node.has_attr('content') else 'data-value' if node.has_attr('data-value') else None
+        raw=clean(node.get(attribute)) if attribute else clean(node.get_text(' ',strip=True))
+        if label and infer_type(raw)!='text':
+            rule=dict(kind='scalar',selector=css_path(node),**({'attribute':attribute} if attribute else {}))
+            kind=infer_type(raw)
+            if prop=='price':
+                scope=node.find_parent(attrs={'itemscope':True})
+                currencies=scope.select('[itemprop="priceCurrency"]') if scope else []
+                if len(currencies)==1:
+                    rule.update(selector=css_path(scope)+' [itemprop="price"]',unit_selector=css_path(scope)+' [itemprop="priceCurrency"]',unit_attribute='content' if currencies[0].has_attr('content') else None)
+                    kind='currency'
+            add(label,kind,rule)
     for table in soup.select('table')[:12]:
         property_rows = [row.find_all(['th', 'td'], recursive=False) for row in table.find_all('tr')]
         if property_rows and all(len(cells) == 2 and cells[0].name == 'th' and cells[1].name == 'td' for cells in property_rows):
@@ -308,6 +399,7 @@ def discover(body, url):
     # Ordinary product/metric markup rarely uses our fixture's .name/.value classes.
     # Generate rules from actual DOM locations, then validate them just like manual rules.
     for node in soup.select('span,strong,b,div,p,output,[itemprop="price"]')[:2500]:
+        if node.get('itemprop')=='price' and any(c['rule'].get('unit_selector') and soup.select_one(c['rule']['selector']) is node for c in candidates):continue
         if node.find_parent(['nav', 'footer', 'header', 'table', 'del', 's']):
             continue
         attribute = 'content' if node.get('itemprop') == 'price' and node.has_attr('content') else None

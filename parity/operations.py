@@ -8,6 +8,7 @@ def overview(service):
     totals={}
     for key,table in [('sources',sources),('documents',pages),('versions',versions),('changes',events)]:
         totals[key]=service.db.one(select(func.count().label('n')).select_from(table))['n']
+    totals['sources']=service.db.one(select(func.count().label('n')).select_from(sources).where(sources.c.removed_at.is_(None)))['n']
     totals['active_documents']=service.db.one(select(func.count().label('n')).select_from(pages.join(sources,pages.c.source_id==sources.c.id)).where(
         pages.c.availability=='active',pages.c.health!='blocked',sources.c.enabled.is_(True)))['n']
     metrics=service.db.all(select(runs.c.metrics))

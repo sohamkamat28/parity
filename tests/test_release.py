@@ -323,7 +323,8 @@ def test_v1_database_migration_preserves_history_and_is_idempotent(tmp_path):
         connection.execute(pages.insert().values(id="existing-page",source_id="existing-source",url="https://example.org/rule",current_id="existing-version",last_version_id="existing-version"))
         connection.execute(versions.insert().values(id="existing-version",page_id="existing-page",number=1,title="Existing rule",content="Original retained evidence",hash="old-hash"))
     old.dispose()
-    upgraded=DB(url)
+    with pytest.raises(RuntimeError,match="upgrade required"):DB(url)
+    upgraded=DB(url,upgrade=True)
     assert upgraded.one(select(schema))["number"]==SCHEMA_VERSION
     assert upgraded.one(select(versions))["content"]=="Original retained evidence"
     assert upgraded.one(select(pages))["current_id"]=="existing-version"
@@ -364,7 +365,7 @@ def test_tls_timeout_closes_connected_socket(monkeypatch):
     from types import SimpleNamespace
     fetcher=Fetcher();closed=[]
     monkeypatch.setattr(fetcher,'addresses',lambda *args:['93.184.216.34'])
-    monkeypatch.setattr(socket,'create_connection',lambda *args,**kwargs:SimpleNamespace(close=lambda:closed.append(True)))
+    monkeypatch.setattr(socket,'create_connection',lambda *args,**kwargs:SimpleNamespace(close=lambda:closed.append(True),settimeout=lambda _:None))
     def timeout(*args,**kwargs):raise TimeoutError('TLS stalled')
     import ssl
     monkeypatch.setattr(ssl,'create_default_context',lambda:SimpleNamespace(wrap_socket=timeout))

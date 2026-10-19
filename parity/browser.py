@@ -62,6 +62,8 @@ def browser_status():
 
 
 def capture(url,source,fixture_origin=None):
+    readiness=browser_status()
+    if readiness['status']!='installed':raise FetchError(readiness['error'],code='rendering_unavailable',transient=False)
     payload={"url":url,"source":source,"fixture_origin":fixture_origin,
              "seconds":CAPTURE_SECONDS,"max_resources":MAX_RESOURCES,"max_bytes":MAX_CAPTURE_BYTES}
     flags=subprocess.CREATE_NO_WINDOW if sys.platform=="win32" else 0
@@ -85,6 +87,6 @@ def capture(url,source,fixture_origin=None):
         detail=stderr.decode("utf-8",errors="replace")[-700:]
         raise FetchError("Browser capture process failed: "+(detail or str(proc.returncode))) from error
     if proc.returncode or result.get("error"):
-        raise FetchError("Browser capture failed: "+result.get("error","worker exited unexpectedly"))
+        raise FetchError("Browser capture failed: "+result.get("error","worker exited unexpectedly"),code=result.get('code','rendering_failed'),transient=result.get('transient',True))
     response=result["response"]
     return Response(response["url"],response["status"],response["headers"],base64.b64decode(response["body"]))
