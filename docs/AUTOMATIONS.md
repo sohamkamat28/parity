@@ -6,7 +6,7 @@ Parity can turn monitored fields into results specific to your work: material co
 
 When adding a source, describe both the fields and the outcome. For example:
 
-> Calculate the material cost of 20 grams of 916 gold, 10 grams of 750 gold and 500 grams of silver. Compare with my ₹5 lakh budget, graph the total, and alert me when it exceeds the budget.
+> Calculate the material cost of 20 grams of 916 gold, 10 grams of 750 gold and 500 grams of silver. Compare with my ₹5 lakh budget and alert me when it exceeds the budget.
 
 Parity previews the page, selects actual extracted fields, and compiles a calculation. It asks for missing quantities, an ambiguous field/date/session, or a price denominator. For example, `INR/10g` means the source price is for ten grams, while `INR/kg` means per kilogram. The calculation cannot start using an assumed denominator. Review AM and PM fields carefully and use a consistent publication date/session. A publication date is different from the time Parity checked the website.
 
@@ -25,9 +25,9 @@ Choose **Choose fields and build visually** to select source fields, supply quan
 - Compare with the previous comparable observation or baseline; compute collected-observation window averages/minima/maxima up to 30 days. These are sample averages, not continuous time-weighted averages. Missing checks are never interpolated. A window exceeding 10,000 observations, or a calculation exceeding 50,000 supplied historical samples, requires a shorter range or fewer inputs.
 - Use comparisons, AND/OR/NOT and conditional numeric values. Outputs can refer to earlier outputs in the same automation; cycles and references between separate automations are rejected.
 
-Single-source calculations appear with that source. Cross-source results appear under **Calculations & automations**. Numeric results use actual evaluation-time trend points; budget results show the supplied budget, utilization and remaining amount. Compatible supplier inputs can be ranked in a comparison table. Conditions show Yes/No rather than a numeric graph. Pinning, hiding, ordering, ranges, accessible observation tables and graph evidence remain available.
+Single-source calculations appear beside the tracked fields in their source group. Cross-source results appear under **Calculations & automations**. Each automation has a compact result list, one status and one **Manage** menu for pause, edit and archive. The dashboard has no graphs, trend ranges or arrangement controls. All enabled fields and outputs are shown; existing layout API records remain retained for compatibility. Budget context and compatible ranked input comparisons are available in calculation evidence.
 
-Each graph point and **How this was calculated** opens the immutable formula revision, input observations, supplied quantities, units and capture links. Editing a quantity, budget or formula creates a new revision. Earlier results remain resolvable. Results retained after failure open their last successful calculation evidence; failed attempts remain in evaluation history.
+Select **Details** beside a calculated value (accessible name: **How this was calculated**) to inspect its immutable formula revision, input observations, supplied quantities, units and capture links. **Calculation history** opens paginated recorded evaluations and their evidence, loaded only when requested. Editing a quantity, budget or formula creates a new revision. Earlier results remain resolvable. Results retained after failure open their last successful calculation evidence; failed attempts remain in evaluation history.
 
 ## Freshness and repairs
 

@@ -39,7 +39,7 @@ def main():
     app_port,portal_port,chat_port,embed_port=port(),port(),port(),port()
     base=f'http://127.0.0.1:{app_port}';portal=f'http://127.0.0.1:{portal_port}'
     output=ROOT/'outputs/runtime'/('browser-'+uuid.uuid4().hex);output.mkdir(parents=True)
-    report={'models':'enabled' if args.with_models else 'stopped','checks':[],'screenshots':[],'console_errors':[]}
+    report={'models':'enabled' if args.with_models else 'stopped','checks':[],'screenshots':[],'console_errors':[],'series_requests':0}
     checks=report['checks']
     def passed(name):checks.append(name);print('PASS: '+name,flush=True)
     with fresh_database(os.getenv('PARITY_TEST_DATABASE_URL') or config.DATABASE_URL) as url:
@@ -65,6 +65,7 @@ def main():
                 response.raise_for_status();source=response.json()
                 with sync_playwright() as pw:
                     browser=pw.chromium.launch();context=browser.new_context(viewport={'width':1440,'height':1000},reduced_motion='reduce')
+                    context.on('request',lambda request: report.__setitem__('series_requests',report.get('series_requests',0)+1) if '/api/dashboard/series' in request.url else None)
                     page=context.new_page();page.on('pageerror',lambda error:(report['console_errors'].append(str(error)),print('Browser JS error: '+str(error),flush=True)))
                     page.goto(base);page.request.post(base+'/api/session',data={'token':env['PARITY_ADMIN_TOKEN']})
                     assert page.get_by_role('button',name='Settings',exact=True).count()==0
@@ -97,38 +98,32 @@ def main():
                     field=next(f for f in dashboard['widgets'] if f['name']=='Current Price');original_capture=field['capture_id']
                     if not args.with_models:assert client.get('/api/runtime').json()['embedding']['status']=='unavailable'
                     passed('Dashboard zero/currency/table/list rendering and normal source inclusion with PostgreSQL')
-                    expect(price.locator('.chart-point').first).to_be_visible(timeout=20000)
-                    price.locator('.chart-point').first.focus();page.keyboard.press('Enter')
-                    expect(page.get_by_role('dialog').get_by_text('Stored source evidence',exact=True)).to_be_visible()
-                    page.keyboard.press('Escape')
-                    page.get_by_role('button',name='30 days',exact=True).click()
-                    expect(page.get_by_role('button',name='30 days',exact=True)).to_have_attribute('aria-pressed','true')
+                    expect(page.locator('.data-chart, .history-chart')).to_have_count(0)
+                    expect(page.get_by_role('button',name='Arrange dashboard',exact=True)).to_have_count(0)
+                    expect(page.get_by_role('group',name='Graph time range',exact=True)).to_have_count(0)
                     price.locator('.field-details > summary').focus();page.keyboard.press('Enter')
                     expect(price.locator('.field-details')).to_have_attribute('open','')
-                    price.get_by_text('Observation data',exact=True).click()
-                    expect(price.get_by_role('table')).to_be_visible()
-                    price.get_by_text('Observation data',exact=True).click()
-                    page.get_by_role('button',name='7 days',exact=True).click()
+                    price.get_by_role('button',name='View evidence',exact=True).click()
+                    expect(page.get_by_role('dialog').get_by_text('Stored source evidence',exact=True)).to_be_visible()
+                    page.keyboard.press('Escape')
+                    price.get_by_role('button',name='View history',exact=True).click()
+                    expect(page.get_by_role('dialog').locator('.field-history-row').first).to_be_visible()
+                    expect(page.get_by_role('dialog').locator('.history-chart')).to_have_count(0)
+                    page.keyboard.press('Escape')
                     announcements=page.locator('.monitor-widget').filter(has=page.get_by_role('heading',name='Announcements',exact=True))
                     announcements.locator('.field-details > summary').click()
                     page.locator('.monitor-widget').filter(has=page.get_by_role('heading',name='Quarterly results',exact=True)).locator('.field-details > summary').click()
                     expect(announcements.get_by_text('First observed',exact=False).first).to_be_visible()
-                    passed('Inline time-series, ranges, keyboard evidence links, accessible data table and first-observed announcement dates')
-                    price.get_by_text('Observation data',exact=True).click()
+                    passed('Compact graph-free fields, removed arrangement/range controls, keyboard evidence/history and first-observed announcement dates')
                     page.evaluate("id=>{window.acceptanceEvents=0;window.acceptanceStream=new EventSource('/api/events?after='+id);window.acceptanceStream.addEventListener('update',()=>window.acceptanceEvents++);}",dashboard['event_id'])
                     httpx.post(portal+'/admin/modify-honours',headers={'X-Fixture-Token':env['PARITY_FIXTURE_TOKEN']},trust_env=False).raise_for_status()
                     expect(price.locator('.observed-value')).to_have_text('1250 INR',timeout=30000)
                     expect(page.locator('.cell-changed')).to_have_count(1)
-                    expect(price.get_by_role('table')).to_be_visible()
-                    price.get_by_text('Observation data',exact=True).click()
+                    expect(price.locator('.field-details')).to_have_attribute('open','')
                     page.wait_for_function('window.acceptanceEvents > 0',timeout=15000)
                     assert '1,200.50' in client.get('/api/captures/'+original_capture).json()['text']
                     passed('Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained')
-                    # Layout survives reload; background updates preserve open evidence.
-                    page.get_by_role('button',name='Arrange dashboard',exact=True).click()
-                    price.get_by_role('button',name='Pin Current Price',exact=True).click()
-                    eventually(lambda:field['id'] in client.get('/api/dashboard/layout').json()['pinned'])
-                    page.get_by_role('button',name='Done arranging',exact=True).click()
+                    # Background updates preserve expanded details and open evidence.
                     price.get_by_role('button',name='View evidence',exact=True).click()
                     evidence=page.get_by_role('dialog');expect(evidence.get_by_text('Stored source evidence',exact=True)).to_be_visible()
                     checked=next(f for f in client.get('/api/dashboard').json()['widgets'] if f['id']==field['id'])['last_checked_at']
@@ -137,7 +132,7 @@ def main():
                     eventually(lambda:next(f for f in client.get('/api/dashboard').json()['widgets'] if f['id']==field['id'])['last_checked_at']>checked)
                     assert client.get('/api/monitor-changes?kind=changed').json()['total']==changes
                     expect(evidence).to_be_visible();page.keyboard.press('Escape')
-                    passed('Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved')
+                    passed('Unrelated page changes advance verification without field changes; evidence panel and expanded details preserved')
                     # API fault becomes a retained-value warning, then recovers.
                     httpx.post(portal+'/admin/fault',headers={'X-Fixture-Token':env['PARITY_FIXTURE_TOKEN']},json={'target':'metrics','status':403},trust_env=False).raise_for_status()
                     expect(page.get_by_role('heading',name='Needs attention',exact=True)).to_be_visible(timeout=30000)
@@ -164,8 +159,7 @@ def main():
                     # Closing the tab does not stop worker services.
                     page.close();httpx.post(portal+'/admin/reset',headers={'X-Fixture-Token':env['PARITY_FIXTURE_TOKEN']},trust_env=False).raise_for_status()
                     eventually(lambda:any(f['name']=='Current Price' and f['value']=='1200.5' for f in client.get('/api/dashboard').json()['widgets']))
-                    assert field['id'] in client.get('/api/dashboard/layout').json()['pinned']
-                    passed('Scheduled monitoring continues with browser tab closed; layout persists')
+                    passed('Scheduled monitoring continues with browser tab closed')
                     # A normal unlabelled JS price is discovered without choosing a rendering mode.
                     planned=client.post('/api/monitors/auto-preview',json={'root_url':portal+'/en/automatic-price','instructions':'Track current price','settings':{}})
                     planned.raise_for_status();draft=planned.json()
@@ -197,30 +191,14 @@ def main():
                     expect(other.locator('.monitor-widget')).to_have_count(1)
                     assert other.get_by_role('heading',name='Secondary price',exact=True).count()==0
                     price=primary.locator('.monitor-widget').filter(has=page.get_by_role('heading',name='Current Price',exact=True))
-                    # Source filters, hidden fields, pinned ordering and native expanded state all remain useful.
+                    # The simplified dashboard shows all fields; stored layout APIs remain compatible.
                     page.get_by_label('Dashboard source',exact=True).select_option(source['id'])
                     expect(groups).to_have_count(1)
-                    page.get_by_role('button',name='Arrange dashboard',exact=True).click()
-                    secondary=primary.locator('.monitor-widget').filter(has=page.get_by_role('heading',name='Secondary price',exact=True))
-                    before_order=primary.locator('.monitor-widget-heading h3').all_text_contents()
-                    earlier=secondary.get_by_role('button',name='Move Secondary price earlier',exact=True)
-                    (earlier if earlier.is_enabled() else secondary.get_by_role('button',name='Move Secondary price later',exact=True)).click()
-                    expect(primary.locator('.monitor-widget-heading h3')).not_to_have_text(before_order)
-                    eventually(lambda:extra_id in client.get('/api/dashboard/layout').json()['order'])
-                    assert other_id in client.get('/api/dashboard/layout').json()['order']
-                    page.get_by_role('button',name='Done arranging',exact=True).click()
+                    expect(page.get_by_role('button',name='Arrange dashboard',exact=True)).to_have_count(0)
                     page.get_by_label('Dashboard source',exact=True).select_option('')
                     expect(groups).to_have_count(2)
-                    page.get_by_role('button',name='Arrange dashboard',exact=True).click()
-                    price.get_by_role('button',name='Hide Current Price',exact=True).click()
-                    eventually(lambda:field['id'] in client.get('/api/dashboard/layout').json()['hidden'])
-                    page.get_by_role('button',name='Done arranging',exact=True).click()
-                    expect(primary.get_by_role('heading',name='Current Price',exact=True)).to_have_count(0)
-                    expect(primary.get_by_text('5 tracked fields · 1 hidden',exact=True)).to_be_visible()
-                    page.get_by_role('button',name='Arrange dashboard',exact=True).click()
-                    price.get_by_role('button',name='Show Current Price',exact=True).click()
-                    page.get_by_role('button',name='Done arranging',exact=True).click()
-                    expect(primary.locator('.monitor-widget').first.get_by_role('heading',name='Current Price',exact=True)).to_be_visible()
+                    expect(primary.get_by_role('heading',name='Current Price',exact=True)).to_be_visible()
+                    assert other_id in client.get('/api/dashboard/layout').json()['order']
                     price.locator('.field-details > summary').click()
                     price.get_by_role('button',name='View history',exact=True).click()
                     expect(page.get_by_role('dialog').get_by_text('Current Price — observed history',exact=True)).to_be_visible()
@@ -230,7 +208,7 @@ def main():
                     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
                     expect(primary.get_by_role('heading',name='Secondary price',exact=True)).to_be_visible()
                     page.screenshot(path=str(output/'source-grouped-narrow.png'),full_page=True);report['screenshots'].append(str((output/'source-grouped-narrow.png').relative_to(ROOT)))
-                    passed('Source-grouped overview combines multiple monitors, keeps fields with their website, and preserves filters, hiding, pins, source-local ordering without dropping other-source preferences, keyboard details and history at desktop/390px')
+                    passed('Source-grouped overview combines multiple monitors, keeps fields with their website, and preserves filters, stored API preferences, keyboard details and history at desktop/390px')
                     page.close()
 
                     if args.with_models:
@@ -260,6 +238,7 @@ def main():
                     page.get_by_role('tab',name='Configuration',exact=True).click()
                     expect(page.get_by_role('button',name='Resume monitoring',exact=True)).to_be_visible()
                     passed('Remove/restore UI retains immutable evidence, hides active source and restores with monitoring paused')
+                    assert report.get('series_requests',0)==0,report
                     assert not report['console_errors'],report['console_errors']
                     browser.close()
         finally:owned.close()

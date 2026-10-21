@@ -33,7 +33,7 @@ def main():
     output_directory = ROOT / 'outputs/runtime' / ('automation-browser-' + uuid.uuid4().hex)
     output_directory.mkdir(parents=True)
     target = ROOT / 'docs/verification' / ('automation-browser-models.json' if args.with_models else 'automation-browser.json')
-    report = {'models': 'enabled' if args.with_models else 'stopped', 'checks': [], 'screenshots': [], 'console_errors': [], 'status': 'running'}
+    report = {'models': 'enabled' if args.with_models else 'stopped', 'checks': [], 'screenshots': [], 'console_errors': [], 'series_requests': 0, 'status': 'running'}
 
     def passed(name):
         report['checks'].append(name)
@@ -104,6 +104,7 @@ def main():
                 with sync_playwright() as pw:
                     browser = pw.chromium.launch()
                     context = browser.new_context(viewport={'width': 1440, 'height': 1000}, reduced_motion='reduce')
+                    context.on('request',lambda request: report.__setitem__('series_requests',report.get('series_requests',0)+1) if '/api/dashboard/series' in request.url else None)
                     page = context.new_page()
                     page.on('pageerror', lambda error: report['console_errors'].append(str(error)))
                     page.goto(base)
@@ -180,8 +181,9 @@ def main():
                     expect(delivered.locator('.calculation-value')).to_have_text('10 INR')
                     passed('Ambiguous instructions request clarification without activation; visual field picker, supplied inputs and output dependencies create a cross-source calculation including zero')
 
-                    delivered.get_by_text('Supplier comparison · controls', exact=True).click()
-                    delivered.get_by_role('button', name='Edit calculation', exact=True).click()
+                    comparison = page.get_by_role('region', name='Supplier comparison', exact=True)
+                    comparison.locator('.automation-controls > summary').click()
+                    comparison.get_by_role('button', name='Edit calculation', exact=True).click()
                     dialog = page.get_by_role('dialog')
                     dialog.get_by_role('button', name='Choose fields and build visually', exact=False).click()
                     # Await interpretation before making edits; compilation must not overwrite user input.
@@ -194,28 +196,37 @@ def main():
                     expect(delivered.locator('.calculation-value')).to_have_text('20 INR', timeout=25000)
                     passed('Editing a supplied parameter creates a validated immutable formula revision and reevaluates its result')
 
-                    expect(gap_card.locator('.chart-point').first).to_be_visible(timeout=20000)
-                    gap_card.locator('.chart-point').first.focus()
+                    expect(page.locator('.data-chart, .history-chart')).to_have_count(0)
+                    expect(page.get_by_role('button', name='Arrange dashboard', exact=True)).to_have_count(0)
+                    gap_card.get_by_role('button', name='How this was calculated', exact=True).focus()
                     page.keyboard.press('Enter')
                     expect(page.get_by_role('dialog').get_by_role('heading', name='How this was calculated', exact=True)).to_be_visible()
                     page.keyboard.press('Escape')
-                    gap_card.get_by_text('Trend and observation data', exact=True).click()
-                    gap_card.get_by_text('Observation data', exact=True).click()
-                    expect(gap_card.get_by_role('table')).to_be_visible()
+                    comparison.get_by_role('button', name='Calculation history', exact=True).click()
+                    expect(page.get_by_role('dialog').get_by_role('table')).to_be_visible()
+                    page.get_by_role('dialog').get_by_role('button', name='Open calculation', exact=True).first.click()
+                    expect(page.get_by_role('dialog').last.get_by_role('heading', name='How this was calculated', exact=True)).to_be_visible()
+                    page.keyboard.press('Escape')
+                    expect(page.get_by_role('dialog').get_by_role('table')).to_be_visible()
+                    page.keyboard.press('Escape')
                     evidence_ids = [a['current']['id'] for a in client.get('/api/automations').json()['items'] if a.get('current')]
                     screenshot(page, 'desktop-calculations')
-                    passed('Calculated zero graphs, real timestamps, keyboard graph evidence and accessible observation tables')
+                    passed('Compact calculated zero values, no charts or arrangement controls, keyboard evidence and on-demand paginated calculation history')
 
+                    comparison.get_by_role('button', name='Calculation history', exact=True).click()
+                    expect(page.get_by_role('dialog').get_by_role('table')).to_be_visible()
                     fault('fault', {'target': 'metrics', 'status': 403})
                     eventually(lambda: automation_named('Supplier comparison')['current']['status'] != 'ok', 45)
-                    expect(delivered.get_by_text('Needs attention', exact=True)).to_be_visible(timeout=20000)
+                    expect(comparison.get_by_text('Needs attention', exact=True)).to_be_visible(timeout=20000)
                     expect(delivered.locator('.calculation-value')).to_have_text('20 INR')
-                    expect(gap_card.get_by_role('table')).to_be_visible()
+                    expect(page.get_by_role('dialog').get_by_role('table')).to_be_visible()
                     fault('clear-faults')
                     eventually(lambda: automation_named('Supplier comparison')['current']['status'] == 'ok', 45)
-                    expect(delivered.get_by_text('Verified', exact=True)).to_be_visible(timeout=20000)
+                    expect(comparison.get_by_text('Verified', exact=True)).to_be_visible(timeout=20000)
                     assert all(client.get('/api/calculations/' + identity).status_code == 200 for identity in evidence_ids)
-                    passed('Source failure blocks fresh calculation, retains marked stale result and open observation table; recovery and prior immutable evidence remain valid')
+                    expect(page.get_by_role('dialog').get_by_role('table')).to_be_visible()
+                    page.keyboard.press('Escape')
+                    passed('Source failure blocks fresh calculation, retains marked stale result and open calculation history; recovery and prior immutable evidence remain valid')
 
                     page.route('**/api/events*', lambda route: route.abort())
                     page.reload()
@@ -242,6 +253,7 @@ def main():
                         assert client.get('/api/calculations/'+citation['evaluation_id']).status_code==200
                         assert citation['supporting_captures']
                         passed('Native free Qwen chat answers from server-calculated values and resolves calculation and source-capture citations')
+                    assert report.get('series_requests',0)==0,report
                     assert not report['console_errors'], report['console_errors']
                     browser.close()
             report['status'] = 'passed'

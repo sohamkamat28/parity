@@ -12,13 +12,13 @@ Use the current verification report to describe what has been demonstrated. Keep
 
 Open Sources → Start monitoring. Enter a public URL and a clear name, then describe specific fields. Show the detected candidates and their actual values. Review the raw text, normalized unit, reporting period and location. Show that zero remains zero, and that a missing selector must be repaired or removed before activation.
 
-Choose Check every beside the instructions (seconds, minutes, hours or days), then click Start automatically. Show the dashboard without editing selectors, fields, rendering or widget types. Explain that Parity validates the values internally and chooses numeric graphs, tables and dated update lists based on their types. Repeat with AI unavailable to demonstrate deterministic detection. For optional customization, use Preview extraction or edit saved rules; latest-period selection remains explicit. New sources use one page, zero link depth and a 15-minute default schedule, which is editable before starting; existing schedules are preserved.
+Choose Check every beside the instructions (seconds, minutes, hours or days), then click Start automatically. Show the dashboard without editing selectors, fields, rendering or widget types. Explain that Parity validates the values internally and shows compact values, tables and dated update lists based on their types. Repeat with AI unavailable to demonstrate deterministic detection. For optional customization, use Preview extraction or edit saved rules; latest-period selection remains explicit. New sources use one page, zero link depth and a 15-minute default schedule, which is editable before starting; existing schedules are preserved.
 
 ## 2. Read the dashboard
 
-Select All sources or one source. Explain Last checked, Last verified, Last changed and Next check separately. Pin a value, reorder/hide a widget, then reload to show that layout persists.
+Select All sources or one source. Explain Last checked, Last verified, Last changed and Next check separately. Open a field’s Details, then show that updates preserve the expanded view.
 
-Start with All sources: point out each website’s name, check schedule and the fields grouped beneath it. Current values and small observed trend graphs are visible without opening anything. Expand Details & history for the full graph, table or announcements. For synthetic financial-style values, explicitly say they are test data. Show the unit and reporting period, the previous comparable value, table cell highlights and linked announcements. Open View evidence to inspect the immutable capture and extraction location. Use the inline graph ranges, focus a point and press Enter to inspect its capture, then expand Observation data. Open View history for the complete paginated observations; do not imply observations exist between checks.
+Start with All sources: point out each website’s name, schedule and compact field rows. Calculations appear next to their source on a wide screen. Expand Details for a table or announcements. For synthetic values, explicitly say they are test data. Show units, reporting periods, previous comparable values, changed cells and linked announcements. Open View evidence for the immutable capture and extraction location, then View history for the full paginated observations. Graphs, trend ranges and dashboard arrangement are no longer part of the interface.
 
 ## 3. Observe an automatic update
 
@@ -61,7 +61,7 @@ From Sources, remove a disposable source using the confirmation. Show that it di
 Use two supplier sources or a dated metal-rate page with actual accessible values. Supply your own required quantities and budget, so the demonstration answers a question the source page does not answer for that order. State whether prices are per gram, ten grams, kilogram or item. Publication sessions and dates must agree. Do not describe AM/PM rates as continuously updating ticks.
 
 1. Enter instructions including quantities and the budget; show any field/unit clarification. Activate the validated plan.
-2. Show total cost, budget utilization, remaining amount and collected trend points.
+2. Show total cost and remaining amount beside the source inputs; open Details for the supplied budget and calculation evidence.
 3. Open **How this was calculated** and trace quantities, formula revision and exact source captures.
 4. Change a supplied quantity in the visual editor. Show the new result and retained earlier formula evidence.
 5. Show a real threshold alert and acknowledgement. Use controlled fixtures for predictable failure/recovery; identify them as fixtures.

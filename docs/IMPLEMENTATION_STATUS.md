@@ -2,6 +2,10 @@
 
 Updated 21 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
 
+## Dashboard simplification — 21 October 2026
+
+The dashboard now uses compact source-grouped field rows with calculations alongside on wide screens and stacked on narrow screens. Graphs, graph-range controls and dashboard arrangement are removed, including field-history graphs and calculated-result graphs. The frontend no longer requests series or layout preferences. Observation and calculation histories remain available on demand with immutable evidence, while backend series/layout contracts remain compatible. Shared calculation status and management controls appear once per automation; acknowledged alerts start collapsed. No database migration or monitor changes are required.
+
 ## Calculation automation follow-up — 21 October 2026
 
 General cross-source calculations, a visual builder, deterministic instruction templates and validated local-model proposals are implemented. Quantities, dimensional units/price denominators, table/list aggregates, compatible history, formula revisions and immutable input evidence feed calculated dashboard values, trends, budget comparisons and ranked inputs. Missing details require clarification; unsupported instruction clauses are not silently omitted.

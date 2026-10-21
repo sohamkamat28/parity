@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-21",
+  "change": "Compact source-grouped dashboard without graphs, ranges or arrangement",
+  "frontend_build": "passed",
+  "postgres_regression": {
+    "passed": 330,
+    "skipped": 4,
+    "seconds": 78.1
+  },
+  "monitoring_browser": "passed",
+  "automation_browser": "passed",
+  "models_for_browser_runs": "stopped",
+  "series_requests_in_each_browser_suite": 0,
+  "final_visual_check": {
+    "desktop": "passed",
+    "narrow_viewport_px": 390,
+    "narrow_document_px": 383,
+    "charts": 0,
+    "console_errors_or_warnings": []
+  },
+  "data_migration_required": false,
+  "saved_monitors_changed": false
+}

@@ -5,22 +5,22 @@
     "Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps",
     "Frequency entered during automatic setup is saved; later schedule edits persist",
     "Dashboard zero/currency/table/list rendering and normal source inclusion with PostgreSQL",
-    "Inline time-series, ranges, keyboard evidence links, accessible data table and first-observed announcement dates",
+    "Compact graph-free fields, removed arrangement/range controls, keyboard evidence/history and first-observed announcement dates",
     "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
-    "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
+    "Unrelated page changes advance verification without field changes; evidence panel and expanded details preserved",
     "Failed HTTP check retains previous verified value and warning; next successful check recovers",
     "Polling fallback delivers scheduled announcement updates",
     "390px layout, keyboard navigation, focus management and reduced-motion setting",
-    "Scheduled monitoring continues with browser tab closed; layout persists",
+    "Scheduled monitoring continues with browser tab closed",
     "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation",
-    "Source-grouped overview combines multiple monitors, keeps fields with their website, and preserves filters, hiding, pins, source-local ordering without dropping other-source preferences, keyboard details and history at desktop/390px",
+    "Source-grouped overview combines multiple monitors, keeps fields with their website, and preserves filters, stored API preferences, keyboard details and history at desktop/390px",
     "Remove/restore UI retains immutable evidence, hides active source and restores with monitoring paused"
   ],
   "screenshots": [
-    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/desktop.png",
-    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/narrow.png",
-    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/source-grouped.png",
-    "outputs/runtime/browser-b351b9d323034cf1bbc14d7fd115b41b/source-grouped-narrow.png"
+    "outputs/runtime/browser-0bfd7ce1ddbb4560af9fabe6614491ca/desktop.png",
+    "outputs/runtime/browser-0bfd7ce1ddbb4560af9fabe6614491ca/narrow.png",
+    "outputs/runtime/browser-0bfd7ce1ddbb4560af9fabe6614491ca/source-grouped.png",
+    "outputs/runtime/browser-0bfd7ce1ddbb4560af9fabe6614491ca/source-grouped-narrow.png"
   ],
   "console_errors": [],
   "status": "passed"
