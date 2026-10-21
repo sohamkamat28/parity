@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-21",
+  "layout": "Supplied source-panel wireframe: searchable source groups, three-column field tiles, two-column calculations and icon refresh",
+  "frontend_build": "passed",
+  "postgres_regression": {
+    "passed": 332,
+    "skipped": 4,
+    "seconds": 69.61
+  },
+  "browser_suites": {
+    "monitoring": "passed",
+    "automation": "passed",
+    "models": "stopped",
+    "viewport_px": 390,
+    "series_requests": 0
+  },
+  "metadata_search": {
+    "max_characters": 200,
+    "before_pagination": true,
+    "sqlite": "passed",
+    "postgresql": "passed",
+    "models_required": false
+  },
+  "manual_existing_installation": {
+    "desktop": "passed",
+    "narrow_viewport_px": 433,
+    "narrow_document_px": 426,
+    "charts": 0,
+    "console_errors_or_warnings": [],
+    "services_ready": [
+      "database",
+      "monitoring",
+      "automation",
+      "notifications",
+      "chat",
+      "embedding"
+    ]
+  },
+  "migration_required": false,
+  "unrelated_favicon_preserved": true
+}

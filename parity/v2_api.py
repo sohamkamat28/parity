@@ -126,10 +126,10 @@ def create_router(service,chat):
     @router.get('/api/captures/{capture_id}')
     def evidence(capture_id:str):return monitor.evidence(capture_id)
     @router.get('/api/dashboard')
-    def dashboard(source_id:str|None=None,include_demo:bool=False,limit:int=Query(50,ge=1,le=100),cursor:str|None=None):return monitor.dashboard(source_id,include_demo,limit,cursor)
+    def dashboard(source_id:str|None=None,include_demo:bool=False,limit:int=Query(50,ge=1,le=100),cursor:str|None=None,q:str|None=Query(None,max_length=200)):return monitor.dashboard(source_id,include_demo,limit,cursor,q=q)
     @router.get('/api/dashboard/widgets')
-    def widgets(monitor_ids:list[str]=Query(min_length=1,max_length=100),source_id:str|None=None,include_demo:bool=False):
-        return monitor.dashboard(source_id,include_demo,100,monitor_ids=monitor_ids)
+    def widgets(monitor_ids:list[str]=Query(min_length=1,max_length=100),source_id:str|None=None,include_demo:bool=False,q:str|None=Query(None,max_length=200)):
+        return monitor.dashboard(source_id,include_demo,100,monitor_ids=monitor_ids,q=q)
     @router.get('/api/dashboard/series')
     def read_dashboard_series(fields:list[str]=Query(min_length=1,max_length=50),start:float|None=None,end:float|None=None):
         from .series import dashboard_series

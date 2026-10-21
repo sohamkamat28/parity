@@ -195,3 +195,17 @@ Verification on this Mac:
 - Final visual inspection of the existing IBJA installation at desktop and 390px confirmed no charts, no horizontal overflow (383px document width within a 390px viewport), and no browser errors/warnings. A remaining old mobile calculation font/padding override was removed during visual review. Empty monitor pagination controls are omitted.
 
 The broader model-enabled browser results above are earlier checks; local models were not required for these layout acceptance runs. No public-site content was changed, no artificial observations were added, and no external notifications were sent. This frontend change makes no new capacity or latency claim.
+
+
+## Supplied dashboard wireframe — 21 October 2026
+
+Implemented the supplied source-panel sketch in the existing dark frontend: full-width search, source name and real URL, icon-only Check now, a three-column field tile grid beside two-column calculated tiles on wide screens, and stacked two-column sections on narrow screens. Tiles show names and actual values; clicking opens details/evidence/history. Source schedules and management open from the source name, calculation actions from the calculation tile, and retained alerts/deliveries from Notifications. Healthy-state badges, totals, source dropdown, repeated timestamps/controls and the redundant desktop breadcrumb bar are absent from the overview. No graphs or arrangement controls were reintroduced. Obsolete row-layout CSS was removed.
+
+Search is server-backed, bounded to 200 characters and applied before pagination. It includes source names/URLs, current field definitions and current calculation definitions, retaining the source context. Literal wildcard handling, blank/oversized/no-match queries, removed sources, aggregates and calculation/source association were checked on SQLite and PostgreSQL. Existing source_id/pagination APIs remain valid. Search makes no model or embedding calls and requires no database migration.
+
+- Final TypeScript/Vite production build passed; Python compile and whitespace checks passed.
+- `.venv/bin/python scripts/test.py --postgres`: **332 passed, 4 intentional skips**, 69.61 seconds.
+- Both updated PostgreSQL browser suites passed with models stopped. They verify keyboard tile activation, nested capture/history dialogs, source/field/calculation search and clearing/no-match states, icon refresh, schedule access, zero values, table/list details, alerts/acknowledgement, formula editing, SSE/polling, stale recovery, source lifecycle and 390px navigation. Both recorded zero series requests and no page errors.
+- The existing local installation was restarted without migration; database, monitoring, automation, notification, chat and embedding readiness all reported ready. Existing source fields/parameters/evidence were preserved. Manual search/no-match/recovery and desktop/narrow visual checks passed, with no browser errors/warnings. Narrow browser viewport width was 433 CSS pixels with a 426px document; the isolated browser suites separately exercise an exact 390px viewport. Temporary viewport overrides were reset.
+
+Machine-readable results: [dashboard-wireframe.json](verification/dashboard-wireframe.json), [browser-no-models.json](verification/browser-no-models.json), [automation-browser.json](verification/automation-browser.json). Model-enabled historical acceptance results above remain distinguished from these model-independent runs. No new capacity or latency claim is made.

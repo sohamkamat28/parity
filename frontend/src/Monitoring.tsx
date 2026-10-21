@@ -1,11 +1,12 @@
 import {useEffect,useRef,useState} from 'react';
-import {Calculator,ChevronRight,History,Pause,Play,Plus,RefreshCw,Settings2,ShieldCheck,TriangleAlert} from 'lucide-react';
+import {Bell,ChevronRight,History,Pause,Play,Plus,RefreshCw,Search,Settings2,ShieldCheck,TriangleAlert,X} from 'lucide-react';
 import type {Shared} from './App';
 import type {Automation,Capture,DashboardData,Monitor,MonitorField,Observation,PageResult,Source} from './types';
 import {api,date,patch,post,relative} from './api';
-import {Badge,Empty,ErrorBox,External,Modal,SectionTitle,Skeleton,Spinner,Status} from './ui';
+import {Badge,Empty,ErrorBox,External,IconButton,Modal,SectionTitle,Skeleton,Spinner,Status} from './ui';
 import {MonitorWizard} from './MonitorWizard';
 import {AutomationCards,AutomationAlerts,AutomationDeliveries,AutomationComposer,CalculationEvidence,useAutomations} from './Automations';
+import './dashboard.css';
 
 function checkError(message:string){return /nodename nor servname|Name or service not known|getaddrinfo failed/.test(message)?'Website DNS lookup failed. Check the URL and this device’s network connection.':message;}
 export function displayValue(value:any,unit?:string):string {
@@ -31,33 +32,32 @@ function fieldState(field:MonitorField){
  if(['missing','invalid'].includes(field.status))return {label:'Needs repair',tone:'amber'};
  return {label:'Check failed',tone:'amber'};
 }
-function FieldOverview({field:f,openCapture,onHistory}:{field:MonitorField;openCapture:Shared['openCapture'];onHistory:()=>void}){
- const [expanded,setExpanded]=useState(false);
+function FieldOverview({field:f,onOpen}:{field:MonitorField;onOpen:()=>void}){
  const state=fieldState(f),value=f.value??f.preview?.value;
  const structured=f.type==='table'||f.type==='list';
  const summary=f.type==='table'?`${value?.rows?.length??0} rows · ${Math.max(0,(value?.headers?.length??1)-1)} columns`:f.type==='list'?`${Array.isArray(value)?value.length:0} items`:'';
  return <article className={`monitor-widget overview-field ${f.status!=='ok'?'field-unverified':''}`} aria-label={`${f.name} tracked field`}>
-  <details className="field-details" open={expanded} onToggle={e=>setExpanded(e.currentTarget.open)}>
-   <summary>
-    <h3 title={f.name}>{f.name.replace(' — latest dated row',' ·')}</h3>
-    <span className="field-glance">{structured&&value!=null?<span className="structured-count">{summary}</span>:<MonitoredValue field={f}/>}</span>
-    <span className="overview-period">{f.period||'—'}</span>
-    <span className="field-row-action">{f.status!=='ok'&&<Badge tone={state.tone}>{state.label}</Badge>}<span>Details<ChevronRight size={13}/></span></span>
-   </summary>
-   {expanded&&<div className="field-detail-body">
-    <Badge tone={state.tone}>{state.label}</Badge>
-    {structured&&<MonitoredValue field={f} compact/>}{f.type==='text'&&<p className="field-full-text">{displayValue(value,f.unit)}</p>}
-    {f.comparison&&<p className="value-comparison">{Number(f.comparison.delta)>0?'+':''}{displayValue(f.comparison.delta,f.type==='percentage'?'percentage points':f.unit)}{f.comparison.percent!==null&&` (${Number(f.comparison.percent)>0?'+':''}${f.comparison.percent}%)`}<span> vs previous comparable value</span></p>}
-    {f.previous_value!==undefined&&!structured&&<p className="reporting-period">Previous comparable value: <strong>{displayValue(f.previous_value,f.unit)}</strong></p>}
-    {f.period&&<p className="reporting-period">Reporting period: <strong>{f.period}</strong></p>}
-    {f.error&&<p className="field-warning">{checkError(f.error)}</p>}
-    <dl className="field-times"><div><dt>Last checked</dt><dd>{date(f.last_checked_at)}</dd></div><div><dt>Last verified</dt><dd>{date(f.last_verified_at)}</dd></div><div><dt>Last changed</dt><dd>{f.last_changed_at?date(f.last_changed_at):'No change recorded'}</dd></div></dl>
-    <div className="widget-footer"><button disabled={!f.capture_id} onClick={()=>f.capture_id&&openCapture(f.capture_id,f)}><ShieldCheck size={14}/>View evidence</button><button disabled={!f.monitor_id} onClick={onHistory}><History size={14}/>View history<ChevronRight size={13}/></button></div>
-   </div>}
-  </details>
+  <button className="field-tile" aria-label={`View details for ${f.name}`} onClick={onOpen}>
+   <h3 title={f.name}>{f.name.replace(' — latest dated row',' ·')}</h3>
+   {structured&&value!=null?<span className="structured-count">{summary}</span>:<MonitoredValue field={f}/>}
+   {f.status!=='ok'&&<span className="tile-warning">{state.label}</span>}
+  </button>
  </article>;
 }
+function FieldDetails({field:f,onClose,openCapture,onHistory}:{field:MonitorField;onClose:()=>void;openCapture:Shared['openCapture'];onHistory:()=>void}){
+ const state=fieldState(f);
+ return <Modal title={f.name.replace(' — latest dated row',' ·')} onClose={onClose} wide><div className="modal-body field-detail-body">
+  <Badge tone={state.tone}>{state.label}</Badge><MonitoredValue field={f} compact/>
+  {f.comparison&&<p className="value-comparison">{Number(f.comparison.delta)>0?'+':''}{displayValue(f.comparison.delta,f.type==='percentage'?'percentage points':f.unit)}{f.comparison.percent!==null&&` (${Number(f.comparison.percent)>0?'+':''}${f.comparison.percent}%)`}<span> vs previous comparable value</span></p>}
+  {f.previous_value!==undefined&&!['table','list'].includes(f.type)&&<p className="reporting-period">Previous comparable value: <strong>{displayValue(f.previous_value,f.unit)}</strong></p>}
+  {f.period&&<p className="reporting-period">Reporting period: <strong>{f.period}</strong></p>}
+  {f.error&&<p className="field-warning">{checkError(f.error)}</p>}
+  <dl className="field-times"><div><dt>Last checked</dt><dd>{date(f.last_checked_at)}</dd></div><div><dt>Last verified</dt><dd>{date(f.last_verified_at)}</dd></div><div><dt>Last changed</dt><dd>{f.last_changed_at?date(f.last_changed_at):'No change recorded'}</dd></div></dl>
+  <div className="widget-footer"><button disabled={!f.capture_id} onClick={()=>f.capture_id&&openCapture(f.capture_id,f)}><ShieldCheck size={14}/>View evidence</button><button disabled={!f.monitor_id} onClick={onHistory}><History size={14}/>View history<ChevronRight size={13}/></button></div>
+ </div></Modal>;
+}
 function nextCheck(at:number){
+ if(!Number.isFinite(at))return 'Not scheduled';
  const seconds=at-Date.now()/1000;if(seconds<=0)return 'Due now';
  return seconds<60?'In less than a minute':seconds<3600?`In ${Math.ceil(seconds/60)} min`:`In ${Math.ceil(seconds/3600)} hr`;
 }
@@ -68,19 +68,18 @@ function frequency(seconds:number){
 const EMPTY_DASHBOARD:DashboardData={sources:[],monitors:[],widgets:[],totals:{},attention:[]};
 export function Dashboard(shared:Shared){
  const {revision,notify,refresh,navigate,openCapture}=shared;
- const [result,setResult]=useState<DashboardData>(EMPTY_DASHBOARD),[source,setSource]=useState(sessionStorage.getItem('parity-dashboard-source')??''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busy,setBusy]=useState(''),[wizard,setWizard]=useState<{source?:Source;monitor?:Monitor}|null>(null),[history,setHistory]=useState<MonitorField|null>(null),[cursor,setCursor]=useState(''),[previous,setPrevious]=useState<string[]>([]),[composer,setComposer]=useState<Automation|true|null>(null),[calculation,setCalculation]=useState<string|null>(null);
- const automations=useAutomations(source,revision);
- useEffect(()=>{const removed=(event:Event)=>{if((event as CustomEvent).detail.source_id===source){setSource('');setCursor('');setPrevious([]);}};window.addEventListener('parity-source-removed',removed);return()=>window.removeEventListener('parity-source-removed',removed);},[source]);
+ const [result,setResult]=useState<DashboardData>(EMPTY_DASHBOARD),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busy,setBusy]=useState(''),[wizard,setWizard]=useState<{source?:Source;monitor?:Monitor}|null>(null),[history,setHistory]=useState<MonitorField|null>(null),[cursor,setCursor]=useState(''),[previous,setPrevious]=useState<string[]>([]),[composer,setComposer]=useState<Automation|true|null>(null),[calculation,setCalculation]=useState<string|null>(null),[selectedField,setSelectedField]=useState<MonitorField|null>(null),[selectedSource,setSelectedSource]=useState<string|null>(null),[notices,setNotices]=useState(false);
+ const automations=useAutomations('',revision,query);
+ useEffect(()=>{const timer=setTimeout(()=>{setQuery(search.trim());setCursor('');setPrevious([]);},200);return()=>clearTimeout(timer);},[search]);
  const current=useRef(result),generations=useRef(new Map<string,number>()),sequence=useRef(0);current.current=result;
  useEffect(()=>{
   let cancelled=false;
   const update=(event:Event)=>{
    const row=(event as CustomEvent).detail;
-   if(source&&row.source_id&&row.source_id!==source)return;
    const ids=current.current.monitors.filter(m=>row.monitor_id?m.id===row.monitor_id:m.source_id===row.source_id).map(m=>m.id);
    if(!ids.length)return;
    const serial=++sequence.current;ids.forEach(id=>generations.current.set(id,serial));
-   const params=new URLSearchParams({});if(source)params.set('source_id',source);ids.forEach(id=>params.append('monitor_ids',id));
+   const params=new URLSearchParams({});if(query)params.set('q',query);ids.forEach(id=>params.append('monitor_ids',id));
    api<DashboardData>(`/api/dashboard/widgets?${params}`).then(next=>{
     if(cancelled)return;
     const applicable=new Set(ids.filter(id=>generations.current.get(id)===serial));
@@ -88,8 +87,8 @@ export function Dashboard(shared:Shared){
    }).catch(e=>{if(!cancelled)setError(e.message);});
   };
   window.addEventListener('parity-monitor-update',update);return()=>{cancelled=true;window.removeEventListener('parity-monitor-update',update);};
- },[source]);
- useEffect(()=>{sessionStorage.setItem('parity-dashboard-source',source);let stale=false;const params=new URLSearchParams({});if(source)params.set('source_id',source);if(cursor)params.set('cursor',cursor);api<DashboardData>(`/api/dashboard?${params}`).then(r=>{if(!stale){setResult({...EMPTY_DASHBOARD,...r});setError('');}}).catch(e=>{if(!stale)setError(e.message);}).finally(()=>{if(!stale)setLoading(false);});return()=>{stale=true;};},[source,revision,cursor]);
+ },[query]);
+ useEffect(()=>{let stale=false;const params=new URLSearchParams({});if(query)params.set('q',query);if(cursor)params.set('cursor',cursor);api<DashboardData>(`/api/dashboard?${params}`).then(r=>{if(!stale){setResult({...EMPTY_DASHBOARD,...r});setError('');}}).catch(e=>{if(!stale)setError(e.message);}).finally(()=>{if(!stale)setLoading(false);});return()=>{stale=true;};},[query,revision,cursor]);
  const widgets=(result.widgets?.length?result.widgets:result.monitors.flatMap(m=>m.fields.map(f=>({...f,monitor_id:m.id,source_id:m.source_id,source_name:m.source_name})))).filter(f=>f.enabled!==false);
  const groups=Array.from(new Set(result.monitors.map(m=>m.source_id))).map(id=>{
   const monitors=result.monitors.filter(m=>m.source_id===id),source=result.sources.find(s=>s.id===id)??shared.data.sources.find(s=>s.id===id);
@@ -97,37 +96,41 @@ export function Dashboard(shared:Shared){
  }).sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
  const check=async(id:string)=>{setBusy(id);try{await post(`/api/sources/${id}/crawl`);notify('Check queued. Values will update when extraction completes.');await refresh();}catch(e){notify((e as Error).message,true);}finally{setBusy('');}};
  const repair=(id:string)=>{const monitor=result.monitors.find(m=>m.id===id);if(monitor)setWizard({monitor,source:result.sources.find(s=>s.id===monitor.source_id)??shared.data.sources.find(s=>s.id===monitor.source_id)});};
- return <div className="screen dashboard-screen"><SectionTitle title="Dashboard" action={<div className="automation-launch"><button className="button" onClick={()=>setComposer(true)}>Create calculation or automation</button><button className="button primary" onClick={()=>setWizard({})}><Plus size={16}/>Start monitoring</button></div>}/>
- <div className="dashboard-toolbar"><label className="inline-field">Source<select aria-label="Dashboard source" value={source} onChange={e=>{setSource(e.target.value);setCursor('');setPrevious([]);}}><option value="">All sources</option>{(shared.data.sources.length?shared.data.sources:result.sources).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><p className="dashboard-counts" aria-label="Monitoring totals">{groups.length} {groups.length===1?'source':'sources'}<span>·</span>{result.totals.fields??widgets.length} tracked fields{Number(result.totals.attention)>0&&<strong>{result.totals.attention} need attention</strong>}</p></div>
- {automations.error&&<ErrorBox>Calculations could not refresh: {automations.error} <button onClick={automations.reload}>Retry</button></ErrorBox>}
- <AutomationDeliveries deliveries={automations.deliveries.filter(d=>!source||automations.items.some(a=>a.id===d.automation_id))}/>
- <AutomationAlerts alerts={automations.alerts.filter(a=>!source||automations.items.some(i=>i.id===a.automation_id))} onEvidence={setCalculation} onChange={automations.reload} notify={notify}/>
- {error&&<ErrorBox>{error} <button onClick={refresh}>Retry</button></ErrorBox>}
- {loading?<Skeleton/>:!result.monitors.length?<div className="panel"><Empty title={source?'No monitors for this source':'Choose the information you want to follow'} action={<button className="button primary" onClick={()=>setWizard({source:result.sources.find(s=>s.id===source)})}><Plus size={16}/>Create a monitor</button>}>Add a website, describe what matters, and review the extracted values before enabling scheduled checks.</Empty></div>:<>
- {(result.next_cursor||previous.length>0)&&<p className="dashboard-page-note">Showing fields on this page. Use Previous or Next below to see more monitored fields.</p>}
- <div className="source-overviews">{groups.map(group=>{
-  const {id,source:website,monitors,fields,attention}=group;
-  const calculations=automations.items.filter(a=>a.source_ids.length===1&&a.source_ids[0]===id);
-  const paused=monitors.every(m=>m.paused),partPaused=!paused&&monitors.some(m=>m.paused);
-  const checked=Math.max(...monitors.map(m=>m.last_checked_at??0)),next=Math.min(...monitors.filter(m=>!m.paused&&m.next_check_at).map(m=>m.next_check_at!));
-  const issues=Array.from(new Set(attention.map(a=>checkError(a.error||a.status.replaceAll('_',' ')))));
-  let domain='';try{domain=new URL(website?.root_url??'').hostname;}catch{/* A source without a valid URL still keeps its saved field overview. */}
-  return <section className="source-overview panel" aria-label={`${group.name} source overview`} key={id}>
-   <header className="source-overview-heading"><div className="source-overview-title"><h2>{group.name}</h2>{domain&&<span>{domain}</span>}</div><Badge tone={paused?'neutral':attention.length?'amber':'green'}>{paused?'Paused':attention.length?'Needs attention':partPaused?'Partly paused':'Monitoring'}</Badge><div className="source-overview-actions"><button className="button small" disabled={!!busy} onClick={()=>check(id)}>{busy===id?<Spinner/>:<RefreshCw size={13}/>}Check now</button><button className="text-button" onClick={()=>{sessionStorage.setItem('parity-source',id);navigate('sources');window.dispatchEvent(new CustomEvent('parity-source',{detail:id}));}}>Manage source<ChevronRight size={13}/></button></div></header>
-   <div className="source-overview-meta"><strong>{fields.length} {(result.next_cursor||previous.length>0)?'fields shown':fields.length===1?'tracked field':'tracked fields'}</strong>{website?.config.interval&&<span>{frequency(Number(website.config.interval))}</span>}<span>Last checked <time title={date(checked)}>{checked?relative(checked):'Not yet'}</time></span><span>Next check <time title={Number.isFinite(next)?date(next):undefined}>{paused?'Paused':Number.isFinite(next)?nextCheck(next):'Scheduled'}</time></span></div>
-   {attention.length>0&&<details className="source-attention"><summary><TriangleAlert size={14}/><h3>Needs attention</h3><span>{attention.length} {attention.length===1?'field':'fields'} · {issues.length===1?issues[0]:'Some fields could not be verified. Open for details.'}</span><ChevronRight size={14}/></summary><div>{issues.map(issue=>{const affected=attention.filter(a=>checkError(a.error||a.status.replaceAll('_',' '))===issue);return <div className="attention-row" key={issue}><div><strong>{affected.map(a=>a.name).join(', ')}</strong><p>{issue}</p><p>Previous valid values are retained when a check fails.</p></div><div className="monitor-actions">{Array.from(new Set(affected.filter(a=>a.action==='Repair extraction').map(a=>a.monitor_id))).map(mid=><button className="button small" key={mid} onClick={()=>repair(mid)}>Repair extraction</button>)}</div></div>;})}</div></details>}
-   <div className={`source-overview-body ${calculations.length?'with-calculations':''}`}>
-    <section className="source-field-section" aria-label={`${group.name} tracked information`}>
-     <div className="source-section-heading"><h3>Tracked information</h3></div>
-     <div className="source-field-columns" aria-hidden="true"><span>Field</span><span>Value</span><span>Period</span><span/></div>
-     <div className="source-fields">{fields.map(f=><FieldOverview key={`${f.monitor_id}:${f.id}`} field={f} openCapture={openCapture} onHistory={()=>setHistory(f)}/>)}</div>
-    </section>
-    {calculations.length>0&&<section className="source-calculations" aria-label={`${group.name} calculations`}><div className="source-section-heading"><h3>Calculations</h3><Calculator size={14}/></div><AutomationCards items={calculations} shared={shared} onEvidence={setCalculation} onEdit={setComposer}/></section>}
-   </div>
-   <details className="source-monitor-settings"><summary>Monitoring controls</summary><div>{monitors.map(m=><div className="source-monitor-control" key={m.id}><strong>{m.name}</strong><span>{m.paused?'Paused':'Scheduled checks enabled'}</span><button className="button small" onClick={async()=>{try{await patch(`/api/monitors/${m.id}`,{paused:!m.paused});await refresh();}catch(e){notify((e as Error).message,true);}}}>{m.paused?<Play size={13}/>:<Pause size={13}/>} {m.paused?'Resume monitoring':'Pause monitoring'}</button><button className="button small" onClick={()=>repair(m.id)}><Settings2 size={13}/>Edit tracked fields</button></div>)}</div></details>
-  </section>;
- })}</div>
- {(result.next_cursor||previous.length>0)&&<div className="pagination"><span>{result.total??result.totals.monitors} monitors</span><div><button className="button small" disabled={!previous.length} onClick={()=>{setCursor(previous.at(-1)!);setPrevious(p=>p.slice(0,-1));}}>Previous monitors</button><button className="button small" disabled={!result.next_cursor} onClick={()=>{setPrevious(p=>[...p,cursor]);setCursor(result.next_cursor!);}}>Next monitors</button></div></div>}</>}{automations.items.some(a=>a.source_ids.length!==1||!groups.some(g=>g.id===a.source_ids[0]))&&<section className="automation-section"><div className="automation-section-header"><h2>Calculations & automations</h2></div><AutomationCards items={automations.items.filter(a=>a.source_ids.length!==1||!groups.some(g=>g.id===a.source_ids[0]))} shared={shared} onEvidence={setCalculation} onEdit={setComposer}/></section>}{(automations.total>50||automations.hasPrevious)&&<div className="pagination"><span>{automations.total} calculations and automations</span><div><button className="button small" disabled={!automations.hasPrevious} onClick={()=>automations.previous()}>Previous calculations</button><button className="button small" disabled={!automations.nextCursor} onClick={()=>automations.next()}>Next calculations</button></div></div>}{composer&&<AutomationComposer automation={composer===true?undefined:composer} onClose={()=>setComposer(null)} onSaved={async()=>{setComposer(null);automations.reload();notify('Automation saved. Calculation and alert evaluation is queued.');await refresh();}}/>}{calculation&&<CalculationEvidence id={calculation} onClose={()=>setCalculation(null)} openCapture={openCapture}/ >}{wizard&&<MonitorWizard source={wizard.source} monitor={wizard.monitor} onClose={()=>setWizard(null)} onSaved={async()=>{setWizard(null);notify('Monitoring saved. The first check is queued.');await refresh();}}/>}{history&&<FieldHistory field={history} onClose={()=>setHistory(null)} openCapture={openCapture}/>}</div>;
+ const unread=automations.alerts.filter(a=>!a.acknowledged_at).length,deliveryFailures=automations.deliveries.filter(d=>['failed','disabled'].includes(d.status)).length;
+ const sourceDetails=groups.find(group=>group.id===selectedSource);
+ const fieldDetails=selectedField&&(widgets.find(f=>f.id===selectedField.id&&f.monitor_id===selectedField.monitor_id)??selectedField);
+ const crossSource=automations.items.filter(a=>a.source_ids.length!==1||!groups.some(g=>g.id===a.source_ids[0]));
+ const manageSource=(id:string)=>{sessionStorage.setItem('parity-source',id);navigate('sources');window.dispatchEvent(new CustomEvent('parity-source',{detail:id}));};
+ return <div className="screen dashboard-screen">
+  <SectionTitle title="Dashboard" action={<div className="automation-launch"><button className="button" aria-label="Create calculation or automation" onClick={()=>setComposer(true)}>Create calculation</button>{(unread>0||deliveryFailures>0)&&<button className="dashboard-notification" aria-label="Notifications" title="Alerts and delivery issues" onClick={()=>setNotices(true)}><Bell size={18}/><span>{unread+deliveryFailures}</span></button>}<IconButton className="add-source-button" label="Start monitoring" onClick={()=>setWizard({})}><Plus size={22}/></IconButton></div>}/>
+  <div className="dashboard-search"><Search size={18}/><input aria-label="Search dashboard" placeholder="Search sources, fields or calculations" maxLength={200} value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<IconButton label="Clear dashboard search" onClick={()=>setSearch('')}><X size={16}/></IconButton>}</div>
+  {automations.error&&<ErrorBox>Calculations could not refresh: {automations.error} <button onClick={automations.reload}>Retry</button></ErrorBox>}
+  {error&&<ErrorBox>{error} <button onClick={refresh}>Retry</button></ErrorBox>}
+  {loading?<Skeleton/>:!result.monitors.length&&!crossSource.length?<div className="panel"><Empty title={query?'No matching sources':'Add your first source'} action={query?<button className="button" onClick={()=>setSearch('')}>Clear search</button>:<button className="button primary" onClick={()=>setWizard({})}><Plus size={16}/>Start monitoring</button>}>{query?'Try another source, field or calculation name.':'Add a website and describe what you want to track.'}</Empty></div>:<>
+   <div className="source-overviews">{groups.map(group=>{
+    const {id,source:website,monitors,fields,attention}=group,calculations=automations.items.filter(a=>a.source_ids.length===1&&a.source_ids[0]===id);
+    const paused=monitors.every(m=>m.paused);
+    return <section className="source-overview panel" aria-label={`${group.name} source overview`} key={id}>
+     <header className="source-overview-heading"><div className="source-overview-title"><button className="source-name-button" title="Source details and monitoring controls" onClick={()=>setSelectedSource(id)}><h2>{group.name}</h2></button>{website?.root_url&&<External url={website.root_url}>{website.root_url.replace(/^https?:\/\//,'').replace(/\/$/,'')}</External>}</div>{paused&&<Badge>Paused</Badge>}{attention.length>0&&<button className="source-attention-link" onClick={()=>setSelectedSource(id)}><TriangleAlert size={14}/><span>Needs attention</span></button>}<IconButton className="source-refresh" label="Check now" disabled={busy===id||paused} onClick={()=>void check(id)}>{busy===id?<Spinner/>:<RefreshCw size={18}/>}</IconButton></header>
+     <div className={`source-overview-body ${calculations.length?'with-calculations':''}`}>
+      <section className="source-field-section" aria-label={`${group.name} tracked information`}><div className="source-fields">{fields.map(f=><FieldOverview key={`${f.monitor_id}:${f.id}`} field={f} onOpen={()=>setSelectedField(f)}/>)}</div></section>
+      {calculations.length>0&&<section className="source-calculations" aria-label={`${group.name} calculations`}><h3 className="source-calculation-title">Calculations</h3><AutomationCards items={calculations} shared={shared} onEvidence={setCalculation} onEdit={setComposer}/></section>}
+     </div>
+    </section>;
+   })}</div>
+   {(result.next_cursor||previous.length>0)&&<div className="pagination"><span>{result.total??result.totals.monitors} monitors</span><div><button className="button small" disabled={!previous.length} onClick={()=>{setCursor(previous.at(-1)!);setPrevious(p=>p.slice(0,-1));}}>Previous monitors</button><button className="button small" disabled={!result.next_cursor} onClick={()=>{setPrevious(p=>[...p,cursor]);setCursor(result.next_cursor!);}}>Next monitors</button></div></div>}
+  </>}
+  {crossSource.length>0&&<section className="automation-section"><div className="automation-section-header"><h2>Calculations & automations</h2></div><AutomationCards items={crossSource} shared={shared} onEvidence={setCalculation} onEdit={setComposer}/></section>}
+  {(automations.total>50||automations.hasPrevious)&&<div className="pagination"><span>{automations.total} calculations and automations</span><div><button className="button small" disabled={!automations.hasPrevious} onClick={()=>automations.previous()}>Previous calculations</button><button className="button small" disabled={!automations.nextCursor} onClick={()=>automations.next()}>Next calculations</button></div></div>}
+  {(automations.alerts.length>0||automations.deliveries.length>0)&&<button className="dashboard-notices-link text-button" onClick={()=>setNotices(true)}><Bell size={13}/>Alerts & deliveries</button>}
+  {sourceDetails&&<Modal title={sourceDetails.name} onClose={()=>setSelectedSource(null)}><div className="modal-body source-dashboard-details">{sourceDetails.source?.root_url&&<External url={sourceDetails.source.root_url}>{sourceDetails.source.root_url}</External>}<dl className="field-times"><div><dt>Schedule</dt><dd>{frequency(Number(sourceDetails.source?.config.interval??900))}</dd></div><div><dt>Last checked</dt><dd>{date(Math.max(...sourceDetails.monitors.map(m=>m.last_checked_at??0)))}</dd></div><div><dt>Next check</dt><dd>{sourceDetails.monitors.every(m=>m.paused)?'Paused':nextCheck(Math.min(...sourceDetails.monitors.filter(m=>!m.paused&&m.next_check_at).map(m=>m.next_check_at!)))}</dd></div></dl>{sourceDetails.attention.length>0&&<div className="source-attention"><h3>Needs attention</h3>{Array.from(new Set(sourceDetails.attention.map(a=>a.error||a.status))).map(message=><p key={message}>{checkError(message)}</p>)}</div>}<div className="source-monitor-settings">{sourceDetails.monitors.map(m=><div className="source-monitor-control" key={m.id}><strong>{m.name}</strong><div className="monitor-actions"><button className="button small" onClick={async()=>{try{await patch(`/api/monitors/${m.id}`,{paused:!m.paused});await refresh();}catch(e){notify((e as Error).message,true);}}}>{m.paused?<Play size={13}/>:<Pause size={13}/>} {m.paused?'Resume monitoring':'Pause monitoring'}</button><button className="button small" onClick={()=>{setSelectedSource(null);repair(m.id);}}><Settings2 size={13}/>Edit tracked fields</button></div></div>)}</div><button className="button" onClick={()=>manageSource(sourceDetails.id)}>Manage source<ChevronRight size={14}/></button></div></Modal>}
+  {fieldDetails&&<FieldDetails field={fieldDetails} onClose={()=>setSelectedField(null)} openCapture={openCapture} onHistory={()=>setHistory(fieldDetails)}/>}
+  {notices&&<Modal title="Notifications" onClose={()=>setNotices(false)} wide><div className="modal-body"><AutomationAlerts alerts={automations.alerts} onEvidence={setCalculation} onChange={automations.reload} notify={notify}/><AutomationDeliveries deliveries={automations.deliveries}/>{!automations.alerts.length&&!automations.deliveries.length&&<Empty title="No notifications">Alerts and delivery updates appear here.</Empty>}</div></Modal>}
+  {composer&&<AutomationComposer automation={composer===true?undefined:composer} onClose={()=>setComposer(null)} onSaved={async()=>{setComposer(null);setSearch('');automations.reload();notify('Automation saved. Calculation and alert evaluation is queued.');await refresh();}}/>}
+  {calculation&&<CalculationEvidence id={calculation} onClose={()=>setCalculation(null)} openCapture={openCapture}/>}
+  {wizard&&<MonitorWizard source={wizard.source} monitor={wizard.monitor} onClose={()=>setWizard(null)} onSaved={async()=>{setWizard(null);setSearch('');notify('Monitoring saved. The first check is queued.');await refresh();}}/>}
+  {history&&<FieldHistory field={history} onClose={()=>setHistory(null)} openCapture={openCapture}/>}
+ </div>;
 }
 
 export function FieldHistory({field,onClose,openCapture}:{field:MonitorField;onClose:()=>void;openCapture:Shared['openCapture']}){

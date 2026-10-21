@@ -16,9 +16,9 @@ Choose Check every beside the instructions (seconds, minutes, hours or days), th
 
 ## 2. Read the dashboard
 
-Select All sources or one source. Explain Last checked, Last verified, Last changed and Next check separately. Open a field’s Details, then show that updates preserve the expanded view.
+Use the dashboard search to find a source, field or calculation. Clear it to show all sources. Click the source name to explain its schedule and last/next check; click a field tile for verification/change timestamps.
 
-Start with All sources: point out each website’s name, schedule and compact field rows. Calculations appear next to their source on a wide screen. Expand Details for a table or announcements. For synthetic values, explicitly say they are test data. Show units, reporting periods, previous comparable values, changed cells and linked announcements. Open View evidence for the immutable capture and extraction location, then View history for the full paginated observations. Graphs, trend ranges and dashboard arrangement are no longer part of the interface.
+Start with the clean dashboard: each panel has a source name, website link and refresh icon. Field name/value tiles occupy the left grid; calculation tiles occupy the right grid. Click a tile for its evidence, tables or announcements. Use **View history** for collected observations and **Calculation history** inside calculated evidence for earlier formula evaluations. Show that search finds source, field and calculated-result names without selectors. For synthetic fixtures, clearly identify the values as test data. Graphs, range controls, aggregate strips and dashboard arrangement remain absent.
 
 ## 3. Observe an automatic update
 
@@ -61,7 +61,7 @@ From Sources, remove a disposable source using the confirmation. Show that it di
 Use two supplier sources or a dated metal-rate page with actual accessible values. Supply your own required quantities and budget, so the demonstration answers a question the source page does not answer for that order. State whether prices are per gram, ten grams, kilogram or item. Publication sessions and dates must agree. Do not describe AM/PM rates as continuously updating ticks.
 
 1. Enter instructions including quantities and the budget; show any field/unit clarification. Activate the validated plan.
-2. Show total cost and remaining amount beside the source inputs; open Details for the supplied budget and calculation evidence.
+2. Show total cost and remaining amount beside the source inputs; click the total tile for the supplied budget and calculation evidence.
 3. Open **How this was calculated** and trace quantities, formula revision and exact source captures.
 4. Change a supplied quantity in the visual editor. Show the new result and retained earlier formula evidence.
 5. Show a real threshold alert and acknowledgement. Use controlled fixtures for predictable failure/recovery; identify them as fixtures.

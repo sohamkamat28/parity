@@ -1,0 +1,99 @@
+/* The dashboard follows the source → fields / calculations hierarchy. */
+.dashboard-screen { max-width: 1540px; margin: 0 auto; padding: 38px 36px; }
+.dashboard-screen .section-heading { margin-bottom: 22px; align-items: center; }
+.dashboard-screen .section-heading h1 { font-size: 30px; }
+.dashboard-screen .automation-launch { display: flex; align-items: center; gap: 10px; }
+.dashboard-screen .automation-launch .button { min-height: 40px; padding-inline: 16px; }
+.dashboard-screen .add-source-button { width: 42px; height: 40px; border: 1px solid #507a71; border-radius: 9px; color: #b5f3e5; background: #17352e; }
+.dashboard-search { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 15px; margin-bottom: 24px; border: 1px solid #303b49; border-radius: 9px; background: #10161e; color: #8fa1b2; }
+.dashboard-search:focus-within { border-color: #74cfbc; box-shadow: 0 0 0 2px #74cfbc16; }
+.dashboard-search > input { flex: 1; width: 100%; min-width: 0; min-height: 44px; padding: 0; border: 0; outline: 0; background: transparent; font-size: 13px; }
+.dashboard-search > .icon-button { width: 28px; height: 28px; }
+.dashboard-screen .source-overviews { display: grid; gap: 24px; }
+.dashboard-screen .source-overview { min-width: 0; overflow: hidden; border: 1px solid #303b49; border-radius: 18px; background: #10161e; }
+.dashboard-screen .source-overview-heading { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; padding: 20px 23px; border-bottom: 1px solid #2b3643; }
+.dashboard-screen .source-overview-title { flex: 1; min-width: 0; }
+.source-name-button { display: block; padding: 0; text-align: left; border-radius: 3px; }
+.source-name-button:hover { color: var(--cyan); }
+.source-name-button h2 { font-size: 18px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.dashboard-screen .source-overview-title > .external { display: flex; align-items: center; gap: 6px; width: fit-content; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 5px; color: #98adbe; font-size: 12px; }
+.dashboard-screen .source-overview-title > .external:hover { color: var(--cyan); }
+.dashboard-screen .source-refresh { width: 36px; height: 36px; border-radius: 50%; color: #aec1d1; flex-shrink: 0; }
+.dashboard-screen .source-refresh:hover:not(:disabled) { background: #20303b; color: var(--cyan); }
+.dashboard-screen .source-overview-body { display: block; border: 0; }
+.dashboard-screen .source-overview-body.with-calculations { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.dashboard-screen .source-field-section { min-width: 0; padding: 22px; }
+.dashboard-screen .source-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; border: 0; }
+.dashboard-screen .source-fields > .overview-field { display: block; min-width: 0; border: 0; border-radius: 0; background: none; }
+.field-tile, .calculation-tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; width: 100%; min-height: 104px; height: 100%; padding: 17px; text-align: left; border: 1px solid #35414f; border-radius: 11px; background: #151e28; transition: border-color .15s, background-color .15s; }
+.field-tile:hover, .calculation-tile:hover { border-color: #6bafa1; background: #192630; }
+.field-tile:focus-visible, .calculation-tile:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.field-tile h3, .dashboard-screen .calculation-tile h3 { font-size: 12px; font-weight: 500; line-height: 1.5; color: #aebdcb; margin: 0; overflow-wrap: anywhere; }
+.field-tile .observed-value, .dashboard-screen .calculation-value { display: block; margin: 0; font-family: inherit; font-size: clamp(18px, 1.7vw, 25px); font-weight: 550; letter-spacing: -.5px; line-height: 1.35; font-variant-numeric: tabular-nums; color: #edf4fa; overflow-wrap: anywhere; }
+.field-tile .text-value { font-size: 14px; font-weight: 400; letter-spacing: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.field-tile .structured-count { font-size: 18px; color: #e0eaf2; }
+.field-tile .muted { font-size: 12px; }
+.field-unverified .field-tile { border-color: #786140; }
+.tile-warning { font-size: 10px; line-height: 1.5; color: var(--amber); }
+.dashboard-screen .source-calculations { min-width: 0; padding: 22px; border-left: 1px solid #2b3643; border-top: 0; background: #0e151c; }
+.source-calculation-title { font-size: 14px; font-weight: 550; margin: 0 0 19px; }
+.dashboard-screen .automation-list { display: grid; gap: 18px; }
+.dashboard-screen .calculation-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; padding: 0; }
+.dashboard-screen .calculation-card { display: block; min-width: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+.dashboard-screen .calculation-key-result .calculation-tile { background: #162720; border-color: #385c50; }
+.dashboard-screen .calculation-key-result .calculation-value { color: #b9edda; }
+.dashboard-screen .calculation-key-result.calculation-over-budget .calculation-value, .dashboard-screen .stale-value .calculation-value { color: var(--amber); }
+.dashboard-screen .stale-value .calculation-tile { border-color: #786140; }
+.automation-group-label { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.dashboard-screen .calculation-warning { font-size: 11px; color: var(--amber); padding: 0 0 12px; }
+.dashboard-screen .automation-section { margin-top: 24px; border: 1px solid #303b49; border-radius: 18px; overflow: hidden; background: #10161e; }
+.dashboard-screen .automation-section-header { padding: 20px 23px; }
+.dashboard-screen .automation-section > .automation-list { padding: 22px; }
+.dashboard-screen .automation-section .calculation-rows { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.dashboard-screen > .pagination { padding: 16px 0 0; }
+.source-attention-link { display: flex; align-items: center; gap: 7px; color: var(--amber); font-size: 11px; padding: 6px; }
+.dashboard-notification { position: relative; display: grid; place-items: center; width: 40px; height: 40px; color: var(--amber); }
+.dashboard-notification > span { position: absolute; right: -1px; top: -2px; min-width: 16px; padding: 1px 3px; border-radius: 8px; background: #614b28; font-size: 10px; }
+.dashboard-notices-link { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; margin: 18px 0 0 auto; }
+.field-detail-body > .badge { margin-bottom: 18px; }
+.field-detail-body > .observed-value { font-size: 28px; margin-bottom: 12px; }
+.field-detail-body .field-times, .source-dashboard-details .field-times { background: transparent; border: 0; padding: 18px 0; grid-template-columns: 1fr; gap: 12px; }
+.field-detail-body .field-times > div, .source-dashboard-details .field-times > div { display: flex; justify-content: space-between; gap: 16px; }
+.field-detail-body .widget-footer { padding: 14px 0 0; }
+.source-dashboard-details > .external { overflow-wrap: anywhere; }
+.source-dashboard-details .source-monitor-settings { padding: 0; border-top: 1px solid var(--line); }
+.source-dashboard-details .source-monitor-control { display: grid; gap: 12px; padding: 18px 0; }
+.source-dashboard-details .source-attention { padding: 14px; margin: 8px 0 18px; color: var(--amber); border: 1px solid #786140; border-radius: 6px; }
+.source-dashboard-details .source-attention p { font-size: 12px; margin-top: 8px; }
+.calculation-management { flex-wrap: wrap; justify-content: flex-start; }
+@media (min-width: 761px) { .dashboard-view .topbar { display: none; } }
+@media (max-width: 1250px) and (min-width: 1001px) {
+ .dashboard-screen .source-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ .dashboard-screen .source-overview-body.with-calculations { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+}
+@media (max-width: 1000px) {
+ .dashboard-screen .source-overview-body.with-calculations { grid-template-columns: minmax(0, 1fr); }
+ .dashboard-screen .source-calculations { border-left: 0; border-top: 1px solid #2b3643; }
+ .dashboard-screen { padding: 28px 24px; }
+ .field-tile .observed-value, .dashboard-screen .calculation-value { font-size: 22px; }
+}
+@media (max-width: 600px) {
+ .dashboard-screen { padding: 22px 18px; }
+ .dashboard-screen .section-heading { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+ .dashboard-screen .section-heading h1 { font-size: 27px; }
+ .dashboard-screen .heading-actions { margin-left: auto; }
+ .dashboard-screen .automation-launch { gap: 7px; flex-wrap: nowrap; }
+ .dashboard-screen .automation-launch .button { font-size: 11px; padding-inline: 11px; }
+ .dashboard-screen .source-overview-heading { padding: 17px; gap: 8px; }
+ .source-name-button h2 { font-size: 16px; }
+ .dashboard-screen .source-overview-title > .external { font-size: 11px; }
+ .dashboard-screen .source-field-section, .dashboard-screen .source-calculations { padding: 16px; }
+ .dashboard-screen .source-fields, .dashboard-screen .calculation-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+ .field-tile, .calculation-tile { min-height: 100px; padding: 13px; gap: 9px; }
+ .field-tile h3, .dashboard-screen .calculation-tile h3 { font-size: 11px; }
+ .field-tile .observed-value, .dashboard-screen .calculation-value { font-size: 19px; }
+ .dashboard-search { margin-bottom: 20px; }
+ .source-attention-link > span { display: none; }
+ .dashboard-screen .automation-section .calculation-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .field-tile, .calculation-tile { transition: none; } }

@@ -8,7 +8,7 @@ import tempfile
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Text, or_
 from . import config, monitor_schema as schema
 from .structured import clean, discover, extract_field, fingerprint, soup_for, suggest, TYPES, MAX_FIELDS
 
@@ -480,7 +480,7 @@ class MonitorService:
             enqueue_affected(connection,source['id'],fingerprint([run_id,revision_id,capture['url']]))
         return counts
 
-    def dashboard(self, source_id=None, include_demo=False, limit=50, cursor=None, monitor_ids=None):
+    def dashboard(self, source_id=None, include_demo=False, limit=50, cursor=None, monitor_ids=None, q=None):
         from .db import sources
         limit = min(100, max(1, int(limit)))
         query = select(schema.monitors, sources.c.name.label('source_name'), sources.c.config.label('source_config'), sources.c.next_due, sources.c.paused.label('source_paused'), sources.c.enabled.label('source_enabled'), sources.c.root_url.label('source_root_url'), sources.c.created_at.label('source_created_at')).join(sources, sources.c.id == schema.monitors.c.source_id).where(sources.c.removed_at.is_(None))
@@ -488,13 +488,21 @@ class MonitorService:
             query = query.where(schema.monitors.c.source_id == source_id)
         if not include_demo:
             query = query.where(sources.c.config['demo'].as_boolean().is_not(True), func.coalesce(sources.c.config['source_kind'].as_string(), 'normal') == 'normal')
+        if q and q.strip():
+            from . import automation_schema as automation
+            term=q.strip().lower()
+            if len(term)>200:raise ValueError('Dashboard search is limited to 200 characters.')
+            matches=lambda column:func.lower(cast(column,Text)).contains(term,autoescape=True)
+            matching_automations=select(automation.automations.c.revision_id).join(automation.automation_revisions,automation.automation_revisions.c.id==automation.automations.c.revision_id).where(automation.automations.c.archived_at.is_(None),or_(matches(automation.automations.c.name),matches(automation.automation_revisions.c.plan)))
+            linked_sources=select(automation.automation_dependencies.c.source_id).where(automation.automation_dependencies.c.revision_id.in_(matching_automations))
+            matching_rules=select(schema.monitor_revisions.c.id).where(matches(schema.monitor_revisions.c.fields))
+            query=query.where(or_(matches(sources.c.name),matches(sources.c.root_url),matches(schema.monitors.c.name),schema.monitors.c.revision_id.in_(matching_rules),sources.c.id.in_(linked_sources)))
         # Save the event watermark before reading the snapshot. A concurrent commit
         # is then delivered again on reconnect rather than skipped.
         latest = self.db.one(select(func.max(schema.monitor_events.c.id).label('id')))['id'] or 0
         total = self.db.one(select(func.count().label('n')).select_from(query.subquery()))['n']
         eligible = query.with_only_columns(schema.monitors.c.revision_id).subquery()
         field_total = self.db.one(select(func.coalesce(func.sum(func.json_array_length(schema.monitor_revisions.c.fields)), 0).label('n')).where(schema.monitor_revisions.c.id.in_(select(eligible.c.revision_id))))['n']
-        from sqlalchemy import or_
         overdue = time.time() - sources.c.config['interval'].as_float()
         needs_attention = or_(schema.monitor_field_states.c.status.not_in(['ok', 'pending']), schema.monitor_field_states.c.last_verified_at < overdue)
         attention_total = self.db.one(select(func.count().label('n')).select_from(schema.monitor_field_states.join(schema.monitors, schema.monitor_field_states.c.revision_id == schema.monitors.c.revision_id).join(sources, schema.monitors.c.source_id == sources.c.id)).where(schema.monitors.c.revision_id.in_(select(eligible.c.revision_id)), needs_attention))['n']

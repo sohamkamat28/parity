@@ -6,15 +6,16 @@
     "Calculation evidence lists exact inputs and opens immutable captures; Escape closes only the foremost evidence dialog",
     "Ambiguous instructions request clarification without activation; visual field picker, supplied inputs and output dependencies create a cross-source calculation including zero",
     "Editing a supplied parameter creates a validated immutable formula revision and reevaluates its result",
-    "Compact calculated zero values, no charts or arrangement controls, keyboard evidence and on-demand paginated calculation history",
+    "Calculated value tiles and cross-source server search, no charts/arrangement controls, keyboard evidence and nested paginated history",
     "Source failure blocks fresh calculation, retains marked stale result and open calculation history; recovery and prior immutable evidence remain valid",
     "Polling fallback updates calculated results when SSE is unavailable",
     "390px layout without horizontal overflow, keyboard navigation, composer focus and reduced motion"
   ],
   "screenshots": [
-    "outputs/runtime/automation-browser-8e8cc198262a484092508859dda7961b/desktop-calculations.png",
-    "outputs/runtime/automation-browser-8e8cc198262a484092508859dda7961b/narrow-calculations.png"
+    "outputs/runtime/automation-browser-4aa9fd4e894f4ec482dec151e7d604c7/desktop-calculations.png",
+    "outputs/runtime/automation-browser-4aa9fd4e894f4ec482dec151e7d604c7/narrow-calculations.png"
   ],
   "console_errors": [],
+  "series_requests": 0,
   "status": "passed"
 }

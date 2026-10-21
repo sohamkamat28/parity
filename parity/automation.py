@@ -5,7 +5,7 @@ import json
 import re
 import time
 import uuid
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, cast, Text
 from . import automation_schema as a, monitor_schema as m
 from .db import sources, uid
 from .structured import fingerprint
@@ -222,10 +222,18 @@ class Automations:
         if not row:raise ValueError('Automation not found.')
         return self._records([row])[0]
 
-    def listing(self,source_id=None,limit=50,cursor=None,archived=False):
+    def listing(self,source_id=None,limit=50,cursor=None,archived=False,q=None):
         from .v2_api import paginate
         stmt=select(a.automations).where(a.automations.c.archived_at.is_not(None) if archived else a.automations.c.archived_at.is_(None))
         if source_id:stmt=stmt.where(a.automations.c.revision_id.in_(select(a.automation_dependencies.c.revision_id).where(a.automation_dependencies.c.source_id==source_id)))
+        if q and q.strip():
+            term=q.strip().lower()
+            if len(term)>200:raise ValueError('Calculation search is limited to 200 characters.')
+            matches=lambda column:func.lower(cast(column,Text)).contains(term,autoescape=True)
+            revision_ids=select(a.automation_revisions.c.id).where(matches(a.automation_revisions.c.plan))
+            source_revisions=select(a.automation_dependencies.c.revision_id).join(sources,sources.c.id==a.automation_dependencies.c.source_id).where(or_(matches(sources.c.name),matches(sources.c.root_url)))
+            stmt=stmt.where(or_(matches(a.automations.c.name),a.automations.c.revision_id.in_(revision_ids),a.automations.c.revision_id.in_(source_revisions)))
+
         stmt=stmt.add_columns(a.automations.c.created_at.label('_cursor_at'),a.automations.c.id.label('_cursor_id'))
         page=paginate(self.db,stmt,a.automations.c.created_at,a.automations.c.id,limit,cursor)
         page['items']=self._records(page['items'])

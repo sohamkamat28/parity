@@ -1,6 +1,6 @@
 # Parity 2.0
 
-Website monitoring, immutable evidence, version history and free local AI chat. Track fields on public HTML/JavaScript pages, choose a check frequency, and see each website’s tracked fields and calculated results together without asking chat. PDF extraction, document search, REST, CLI and all five MCP tools remain available.
+Website monitoring, immutable evidence, version history and free local AI chat. Track fields on public HTML/JavaScript pages, choose a check frequency, and see each website’s tracked fields and calculated results in simple tiles without asking chat. Search sources, fields and calculations from the dashboard. PDF extraction, document search, REST, CLI and all five MCP tools remain available.
 
 **Development candidate, 21 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks.
 

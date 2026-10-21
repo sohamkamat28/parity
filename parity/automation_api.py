@@ -15,8 +15,8 @@ def create_automation_router(service):
     def activate(body:dict):return automation.activate(body)
 
     @router.get('/api/automations')
-    def listing(source_id:str|None=None,limit:int=Query(50,ge=1,le=100),cursor:str|None=None,archived:bool=False):
-        return automation.listing(source_id,limit,cursor,archived)
+    def listing(source_id:str|None=None,limit:int=Query(50,ge=1,le=100),cursor:str|None=None,archived:bool=False,q:str|None=Query(None,max_length=200)):
+        return automation.listing(source_id,limit,cursor,archived,q=q)
 
     @router.get('/api/automations/{identity}')
     def detail(identity:str):return automation.get(identity)

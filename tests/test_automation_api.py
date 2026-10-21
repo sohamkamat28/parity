@@ -5,7 +5,7 @@ from fastapi import FastAPI,Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from sqlalchemy import select,func,event
-from parity.db import DB,schema,meta,SCHEMA_VERSION
+from parity.db import DB,schema,meta,SCHEMA_VERSION,sources
 from parity import automation_schema as a,monitor_schema as m,config
 from parity.automation import Automations
 from parity.v2_api import create_router
@@ -180,3 +180,28 @@ def test_preview_inherits_source_units_before_dimension_validation(monitor):
     preview=Automations(service.service).preview({'plan':plan,'use_ai':False})
     assert preview['status']=='ready' and preview['plan']['inputs'][0]['unit']=='INR'
     assert preview['preview']['outputs'][0]['value']=='2401'
+
+
+def test_dashboard_search_keeps_source_and_calculation_context(monitor):
+    service,activated,_=setup_monitor(monitor)
+    worker,auto,_=activate(service,cost_plan(activated));drain(worker)
+    source=service.db.one(select(sources).where(sources.c.id==activated['source']['id']))
+    with client_for(service.service) as client:
+        for term in ['current PRICE',source['name'],source['root_url'],auto['name'],auto['plan']['outputs'][0]['name']]:
+            dashboard=client.get('/api/dashboard',params={'q':term,'limit':1}).json()
+            assert dashboard['total']==1,(term,dashboard)
+            assert dashboard['monitors'][0]['source_id']==activated['source']['id']
+            assert dashboard['totals']['fields']==len(activated['monitor']['fields'])
+            calculations=client.get('/api/automations',params={'q':term,'limit':1}).json()
+            assert calculations['total']==1,(term,calculations)
+            assert calculations['items'][0]['id']==auto['id']
+        with service.db.tx() as connection:
+            connection.execute(sources.update().where(sources.c.id==source['id']).values(name='NeedleXLiteral'))
+        for term in ['no-matching-source-4829','needle%literal','needle_literal']:
+            assert client.get('/api/dashboard',params={'q':term}).json()['total']==0
+            assert client.get('/api/automations',params={'q':term}).json()['total']==0
+        assert client.get('/api/dashboard',params={'q':' '*5}).json()['total']==1
+        assert client.get('/api/dashboard',params={'q':'x'*201}).status_code==422
+        assert client.get('/api/automations',params={'q':'x'*201}).status_code==422
+        service.service.remove_source(activated['source']['id'])
+        assert client.get('/api/dashboard',params={'q':source['name']}).json()['total']==0

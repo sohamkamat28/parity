@@ -2,6 +2,10 @@
 
 Updated 21 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
 
+## Dashboard wireframe implementation — 21 October 2026
+
+The latest dashboard follows the supplied sketch: full-width server-backed search, source name/link and icon refresh, a three-column field tile grid alongside two-column calculations at desktop width, and two-column/stacked grids on narrow screens. Source schedules/management, field history/evidence and calculation controls are accessed by clicking the relevant name or tile. Healthy-state badges, repeated metadata, totals and the old source dropdown no longer crowd the overview. Actionable notifications remain visible; retained alerts/deliveries open separately. Search runs against metadata before bounded pagination and accepts literal queries up to 200 characters. No schema migration, model calls or changed extraction rules are required. The combined suite passed **332 tests with 4 intentional skips**, and both updated PostgreSQL browser acceptance flows passed with models stopped.
+
 ## Dashboard simplification — 21 October 2026
 
 The dashboard now uses compact source-grouped field rows with calculations alongside on wide screens and stacked on narrow screens. Graphs, graph-range controls and dashboard arrangement are removed, including field-history graphs and calculated-result graphs. The frontend no longer requests series or layout preferences. Observation and calculation histories remain available on demand with immutable evidence, while backend series/layout contracts remain compatible. Shared calculation status and management controls appear once per automation; acknowledged alerts start collapsed. No database migration or monitor changes are required.
