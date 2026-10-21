@@ -1,2 +1,2 @@
--r requirements.txt
+-r requirements-core.txt
 psycopg[binary]==3.3.6

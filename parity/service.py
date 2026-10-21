@@ -22,29 +22,29 @@ class Service:
 
     def model(self):
         with self._embed_lock:
-            if self.embedder is None: self.embedder=Embedder()
+            if self.embedder is None:
+                try:self.embedder=Embedder()
+                except Exception as error:
+                    raise ValueError('Semantic search is unavailable. Install the cached MiniLM model and start the embedding service. Monitoring continues.') from error
         return self.embedder
 
     def _prepare_source(self,name,root_url,settings=None):
         root_url=canonical(root_url)
         settings=settings or {}
-        if settings.get("demo") and origin(root_url)!=config.DEMO_ORIGIN:
-            raise ValueError("Demo exception is restricted to the configured fixture origin")
         if not name.strip(): raise ValueError("Source name is required")
         defaults={"allow":["/"],"deny":["/admin","/login"],"selector":"","exclude":".render-timestamp,#cookie-banner",
                   "seeds":[root_url],"discovery_only":[],"max_pages":100,"max_depth":3,
-                  "delay":1.0,"interval":21600,"missing_interval":21600,"max_bytes":10*1024*1024,"demo":False,
+                  "delay":1.0,"interval":21600,"missing_interval":21600,"max_bytes":10*1024*1024,
                   "render_mode":"static","ready_selector":"","resource_origins":[],
                   "source_kind":"normal","scope_mode":"section"}
         allowed=set(defaults)|{"max_bytes"}
         if set(settings)-allowed: raise ValueError("Unknown source configuration field")
         defaults.update(settings)
-        if defaults['source_kind'] not in ('normal','demo','benchmark'):raise ValueError('Invalid source_kind')
+        if defaults['source_kind'] not in ('normal','benchmark'):raise ValueError('Invalid source_kind')
         if defaults['scope_mode'] not in ('page','section','site'):raise ValueError('Invalid scope_mode')
-        if defaults['demo']:defaults['source_kind']='demo'
         for field,lo,hi in [("max_pages",1,500),("max_depth",0,6),("delay",0,60),
                             ("interval",10,604800),("missing_interval",0,604800),("max_bytes",1,10*1024*1024)]:
-            if not isinstance(defaults[field],(float,int)) or not lo<=defaults[field]<=hi:
+            if type(defaults[field]) not in (float,int) or not lo<=defaults[field]<=hi:
                 raise ValueError("Invalid "+field)
         for field in ("max_pages","max_depth","max_bytes"):
             if type(defaults[field]) is not int:raise ValueError(field+" must be an integer")
@@ -57,7 +57,7 @@ class Service:
             if defaults[field]:
                 try:soupsieve.compile(defaults[field])
                 except Exception as error:raise ValueError('Invalid CSS selector: '+field) from error
-        if not defaults["demo"]:
+        if getattr(self.fetcher,"fixture_origin",None) != origin(root_url):
             defaults["delay"]=max(0.5,defaults["delay"])
             defaults["missing_interval"]=max(60,defaults["missing_interval"])
         for key in ["allow","deny","seeds","discovery_only","resource_origins"]:
@@ -85,18 +85,24 @@ class Service:
 
     def update_source(self,source_id,name=None,settings=None,enabled=None,paused=None):
         current=self.source(source_id)
+        if current.get('removed_at') is not None:raise ValueError('Restore this source before changing its configuration.')
         if name is not None or settings is not None:
             if self.db.one(select(runs.c.id).where(runs.c.source_id==source_id,runs.c.status.in_(['queued','running']))):
                 raise ValueError('Wait for the active crawl before editing source rules')
             checked=self._prepare_source(name if name is not None else current['name'],current['root_url'],{**current['config'],**(settings or {})})
-            with self.db.tx() as c:c.execute(sources.update().where(sources.c.id==source_id).values(name=checked['name'],config=checked['config']))
+            with self.db.tx() as c:
+                values=dict(name=checked['name'],config=checked['config'])
+                if checked['config']['interval']!=current['config']['interval']:values['next_due']=time.time()+checked['config']['interval']
+                c.execute(sources.update().where(sources.c.id==source_id,sources.c.removed_at.is_(None)).values(**values))
+                from .monitor_schema import monitor_events
+                c.execute(monitor_events.insert().values(source_id=source_id,kind='source_updated',at=time.time(),detail={}))
         return self.set_source(source_id,enabled,paused) if enabled is not None or paused is not None else self.source(source_id)
 
     def test_source(self,name,root_url,settings=None):
         started=time.perf_counter();source=self._prepare_source(name,root_url,settings)
         if source['config']['render_mode']=='browser':
-            from .browser import capture
-            response=capture(root_url,source,self.fetcher.demo_origin)
+            from .browser import preview_capture
+            response=preview_capture(self,root_url,source)
         else:response=self.fetcher.get(root_url,source)
         if response.status!=200:raise ValueError('Source returned HTTP '+str(response.status))
         doc=extract(response.body,response.headers.get('content-type','').split(';')[0],response.url,source['config'])
@@ -108,15 +114,6 @@ class Service:
         rules['resource_origins']=sorted(source['config'].get('resource_origins',[]))
         signature='extract-v3:'+hashlib.sha256(json.dumps(rules,sort_keys=True).encode()).hexdigest()[:16]
         return signature+':'+self.model().signature if self.inline_index else signature
-
-    def seed_demo(self):
-        existing=self.db.one(select(sources).where(sources.c.root_url==config.DEMO_ORIGIN+"/en/circulars/"))
-        if existing:return existing
-        return self.add_source("KJSCE · demonstration",config.DEMO_ORIGIN+"/en/circulars/",
-            {"demo":True,"allow":["/en/"],"deny":["/admin","/test"],
-             "seeds":[config.DEMO_ORIGIN+"/en/circulars/",config.DEMO_ORIGIN+"/en/sitemap.xml"],
-             "discovery_only":["/en/","/en/circulars/","/en/sitemap.xml"],
-             "selector":"article","delay":0,"interval":60,"missing_interval":2})
 
     def source(self,source_id):
         s=self.db.one(select(sources).where(sources.c.id==source_id))
@@ -223,7 +220,7 @@ class Service:
                         try:
                             if rendered:
                                 from .browser import capture
-                                response=capture(url,source,self.fetcher.demo_origin)
+                                response=capture(url,source,getattr(self.fetcher,"fixture_origin",None))
                             else:response=self.fetcher.get(url,source,headers)
                         except FetchError:
                             if attempt==2:raise
@@ -288,7 +285,13 @@ class Service:
 
     def _observe(self,run_id,url,status,outcome,detail=""):
         with self.db.tx() as c:
-            c.execute(observations.insert().values(id=uid(),run_id=run_id,url=url,at=time.time(),
+            claim=getattr(self._job_context,'claim',None)
+            if claim:
+                self._guard(c,claim['source_id'],run_id,claim['source_generation'])
+                observation_id=hashlib.sha256((run_id+'\0'+url).encode()).hexdigest()[:32]
+                if c.execute(select(observations.c.id).where(observations.c.id==observation_id)).first():return
+            else:observation_id=uid()
+            c.execute(observations.insert().values(id=observation_id,run_id=run_id,url=url,at=time.time(),
                 status=status,outcome=outcome,detail=detail[:1000]))
 
     def _close(self,c,page_id,at):
@@ -402,6 +405,8 @@ class Service:
                 inserted=c.execute(insert(cache).values(**entry).on_conflict_do_nothing(index_elements=['key']))
                 new_count+=max(inserted.rowcount,0)
                 found[key]=dict(c.execute(select(cache).where(cache.c.key==key)).mappings().one())
+            from .search_schema import projection
+            c.execute(projection.delete().where(projection.c.version_id==version_id))
             c.execute(chunks.delete().where(chunks.c.version_id==version_id))
             if items:
                 c.execute(chunks.insert(),[{'id':uid(),'version_id':version_id,'ordinal':i,
@@ -416,6 +421,8 @@ class Service:
                 'new_vectors':new_count,'reused_vectors':len(items)-new_count,'chunks':len(items),'index_status':'ready'}))
             from .search import project_version
             project_version(self,version_id,connection=c)
+            from .monitor_schema import monitor_events
+            c.execute(monitor_events.insert().values(kind='index_updated',at=now,detail={'version_id':version_id}))
         return {'version_id':version_id,'new_vectors':new_count,'reused_vectors':len(items)-new_count,'chunks':len(items)}
 
     def _publish_inline(self,source,run_id,generation,url,page,response,doc,metrics):
@@ -477,6 +484,8 @@ class Service:
             c.execute(events.insert().values(id=uid(),page_id=page_id,run_id=run_id,kind=kind,
                 old_version_id=old["id"] if old else None,new_version_id=version_id,at=now,
                 detail={"new_vectors":new_vectors,"reused_vectors":reused,"chunks":len(items)}))
+            from .search import project_version
+            project_version(self,version_id,connection=c)
         metrics[kind.lower() if kind!="PIPELINE_REPROCESSED" else "modified"]+=1
         metrics["new_vectors"]+=new_vectors;metrics["reused_vectors"]+=reused
         self._observe(run_id,url,200,kind)
@@ -549,7 +558,7 @@ class Service:
         return search(self,query,source_ids,limit,mode,as_of,include_unavailable)
 
     def overview(self):
-        return {"sources":self.db.all(select(sources).order_by(sources.c.created_at)),
+        return {"sources":self.db.all(select(sources).where(sources.c.removed_at.is_(None)).order_by(sources.c.created_at)),
                 "pages":self.db.all(select(pages).order_by(pages.c.title)),
                 "runs":self.db.all(select(runs).order_by(runs.c.created_at.desc()).limit(30)),
                 "changes":self.db.all(select(events, pages.c.title,pages.c.url).join(
@@ -580,9 +589,36 @@ class Service:
         with self.db.tx() as c:
             s=c.execute(select(sources).where(sources.c.id==source_id).with_for_update()).mappings().first()
             if not s:raise ValueError("SOURCE_NOT_FOUND")
+            if s['removed_at'] is not None:raise ValueError('Restore this source before resuming monitoring.')
             if enabled is False:
                 values.update(generation=s["generation"]+1,lease_until=0,lease_run=None)
                 c.execute(runs.update().where(runs.c.source_id==source_id,runs.c.status.in_(["queued","running"])).values(
                     status="cancelled",error="Source disabled",finished_at=time.time()))
             c.execute(sources.update().where(sources.c.id==source_id).values(**values))
+            from .automation import enqueue_affected
+            enqueue_affected(c,source_id,'source-state:'+uid())
+        return self.source(source_id)
+
+    def remove_source(self,source_id,restore=False):
+        """Retain evidence and atomically fence capture workers before hiding a source."""
+        from .job_schema import url_jobs
+        from .monitor_schema import monitor_events
+        now=time.time()
+        with self.db.tx() as c:
+            source=c.execute(select(sources).where(sources.c.id==source_id).with_for_update()).mappings().first()
+            if not source:raise ValueError('SOURCE_NOT_FOUND')
+            removed=source['removed_at'] is not None
+            if removed == (not restore):return dict(source)
+            values=dict(removed_at=None if restore else now,enabled=restore,paused=True,
+                        generation=source['generation']+1,lease_run=None,lease_until=0)
+            c.execute(sources.update().where(sources.c.id==source_id).values(**values))
+            if not restore:
+                c.execute(runs.update().where(runs.c.source_id==source_id,runs.c.status.in_(['queued','running'])).values(
+                    status='cancelled',error='Source removed; history retained',finished_at=now))
+                c.execute(url_jobs.update().where(url_jobs.c.source_id==source_id,url_jobs.c.status.in_(['queued','running'])).values(
+                    status='cancelled',owner=None,generation=url_jobs.c.generation+1,lease_until=0,
+                    finished_at=now,error='Source removed; history retained'))
+            c.execute(monitor_events.insert().values(source_id=source_id,kind='source_restored' if restore else 'source_removed',at=now,detail={}))
+            from .automation import enqueue_affected
+            enqueue_affected(c,source_id,'source-lifecycle:'+uid())
         return self.source(source_id)

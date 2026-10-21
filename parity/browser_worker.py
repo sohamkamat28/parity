@@ -9,7 +9,7 @@ from .fetch import Fetcher, FetchError, Response, canonical, in_scope, resource_
 
 class BudgetFetcher(Fetcher):
     def __init__(self,payload):
-        super().__init__(payload.get("demo_origin"))
+        super().__init__(payload.get("fixture_origin"))
         self.deadline=time.monotonic()+max(1,payload["seconds"]-3)
         self.max_resources=payload["max_resources"]
         self.max_total=payload["max_bytes"]
@@ -42,7 +42,7 @@ def render(payload):
     from playwright.sync_api import sync_playwright
     from .browser import browser_status
     status=browser_status()
-    if status["status"]!="installed":raise FetchError(status["error"])
+    if status["status"]!="installed":raise FetchError(status['error'],code='rendering_unavailable',transient=False)
     fatal=[]
     blocked=[]
     errors=[]
@@ -143,7 +143,7 @@ def main():
         response=render(json.loads(sys.stdin.buffer.read()))
         result={"response":{"url":response.url,"status":response.status,"headers":response.headers,
                             "body":base64.b64encode(response.body).decode("ascii")}}
-    except Exception as error:result={"error":type(error).__name__+": "+str(error)[:1600]}
+    except Exception as error:result={"error":type(error).__name__+": "+str(error)[:1600],"code":getattr(error,"code","rendering_failed"),"transient":getattr(error,"transient",True)}
     sys.stdout.buffer.write(json.dumps(result).encode("utf-8"))
 
 

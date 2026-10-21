@@ -27,11 +27,11 @@ threading.Thread(target=server.serve_forever,daemon=True).start()
 origin=f"http://127.0.0.1:{server.server_port}"
 try:
     with tempfile.TemporaryDirectory() as tmp:
-        config.DATA=Path(tmp);config.DEMO_ORIGIN=origin
+        config.DATA=Path(tmp)
         model=Embedder("minilm")
         service=Service(DB("sqlite:///"+tmp+"/bench.db"),model,Fetcher(origin))
         source=service.add_source("Synthetic 50-page docs",origin+"/docs/",
-            {"demo":True,"allow":["/docs/"],"discovery_only":["/docs/"],"delay":0})
+            {"allow":["/docs/"],"discovery_only":["/docs/"],"delay":0})
         def run():
             start=time.perf_counter();r=service.run(service.enqueue(source["id"])["id"])
             return {"seconds":time.perf_counter()-start,"metrics":r["metrics"],"status":r["status"]}

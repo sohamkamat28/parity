@@ -58,6 +58,10 @@ class Jobs:
 
     def initialize(self,run_id):
         with self.db.tx() as c:
+            source_id=c.execute(select(runs.c.source_id).where(runs.c.id==run_id)).scalar()
+            if source_id is None:return None
+            # Always lock source -> run -> URL job, matching removal/publication.
+            c.execute(select(sources.c.id).where(sources.c.id==source_id).with_for_update()).first()
             run=c.execute(select(runs).where(runs.c.id==run_id).with_for_update()).mappings().first()
             if not run:raise ValueError('RUN_NOT_FOUND')
             if run['status']!='queued':return dict(run)
@@ -109,9 +113,12 @@ class Jobs:
                 runs.c.status=='running',sources.c.enabled.is_(True),url_jobs.c.available_at<=now,
                 or_(url_jobs.c.status=='queued',and_(url_jobs.c.status=='running',url_jobs.c.lease_until<now)))
             if run_id:stmt=stmt.where(url_jobs.c.run_id==run_id)
-            candidates=c.execute(stmt.order_by(url_jobs.c.available_at,url_jobs.c.created_at).limit(30)
-                .with_for_update(skip_locked=True,of=url_jobs)).mappings().all()
-            for row in candidates:
+            candidates=c.execute(stmt.order_by(url_jobs.c.available_at,url_jobs.c.created_at).limit(30)).mappings().all()
+            for candidate in candidates:
+                source_lock=c.execute(select(sources).where(sources.c.id==candidate['source_id']).with_for_update(skip_locked=True)).mappings().first()
+                if not source_lock or not source_lock['enabled'] or source_lock['removed_at'] is not None:continue
+                row=c.execute(stmt.where(url_jobs.c.id==candidate['id']).with_for_update(skip_locked=True,of=url_jobs)).mappings().first()
+                if not row:continue
                 row=dict(row)
                 state=c.execute(select(run_state).where(run_state.c.run_id==row['run_id'])).mappings().one()
                 source=state['source_snapshot'];gen=row['generation']+1;token=f"{self.worker_id}:{row['id']}:{gen}"
@@ -172,6 +179,9 @@ class Jobs:
             while not stopped.wait(max(.1,min(10,config.LEASE_SECONDS/3))):
                 try:self.renew(claim,index=index)
                 except Exception:return
+                try:
+                    self.status('index' if index else 'capture','working')
+                except Exception:pass
         thread=threading.Thread(target=beat,daemon=True);thread.start()
         try:yield
         finally:stopped.set();thread.join(timeout=2)
@@ -236,7 +246,7 @@ class Jobs:
                         c.execute(url_jobs.update().where(url_jobs.c.id==claim['id']).values(metrics=saved))
                     if source['config'].get('render_mode')=='browser':
                         from .browser import capture
-                        response=capture(url,source,self.service.fetcher.demo_origin)
+                        response=capture(url,source,getattr(self.service.fetcher,"fixture_origin",None))
                     else:
                         # Full captures preserve attribute evidence even when text is unchanged.
                         response=self.service.fetcher.get(url,source,{})
@@ -265,7 +275,8 @@ class Jobs:
         except Exception as exc:
             error=str(exc)[:1000]
             if error in ('STALE_WORKER','STALE_PAGE'):raise
-            transient=(response is None and isinstance(exc,(FetchError,TimeoutError,OSError))) or (response and response.status in (429,500,502,503,504))
+            if response is None:response=getattr(exc,'response',None)
+            transient=(response is None and isinstance(exc,(FetchError,TimeoutError,OSError)) and getattr(exc,'transient',True)) or (response and response.status in (429,500,502,503,504))
             if transient and claim['attempts']<3:
                 outcome='queued';retry_at=self._retry_at(response,claim['attempts'])
             else:
@@ -299,6 +310,10 @@ class Jobs:
 
     def finalize(self,run_id):
         with self.db.tx() as c:
+            source_id=c.execute(select(runs.c.source_id).where(runs.c.id==run_id)).scalar()
+            if source_id is None:return None
+            # Always lock source -> run -> URL job, matching removal/publication.
+            c.execute(select(sources.c.id).where(sources.c.id==source_id).with_for_update()).first()
             run=c.execute(select(runs).where(runs.c.id==run_id).with_for_update()).mappings().first()
             if not run or run['status']!='running':return
             jobs=c.execute(select(url_jobs).where(url_jobs.c.run_id==run_id)).mappings().all()
@@ -341,6 +356,8 @@ class Jobs:
             c.execute(runs.update().where(runs.c.id==run_id).values(status=status,finished_at=now,metrics=metrics,
                 error='The page limit was reached' if metrics['budget_exhausted'] else None))
             c.execute(sources.update().where(sources.c.id==source['id']).values(lease_run=None,lease_until=0,next_due=now+source['config']['interval']))
+            from .monitor_schema import monitor_events
+            c.execute(monitor_events.insert().values(source_id=source['id'],kind='check_completed',at=now,detail={'run_id':run_id,'status':status}))
 
     def drain(self,run_id):
         self.initialize(run_id)
@@ -364,7 +381,9 @@ class Jobs:
 
     def index_once(self):
         claim=self.claim_index()
-        if not claim:return None
+        if not claim:
+            self.status('index','ready')
+            return None
         error=None;result=None
         self.service._job_context.index_claim=claim
         try:

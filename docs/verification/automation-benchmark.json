@@ -1,0 +1,55 @@
+{
+  "profile": "postgresql",
+  "fixture": "one price field, 20 automations, two arithmetic outputs and one threshold rule each; 12 alternating price checks",
+  "models": "stopped",
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "python": "3.14.6",
+  "scope": "Sequential durable worker evaluation includes database publication; no network latency, true cold caches or total deployment memory measurement.",
+  "evaluations": 240,
+  "checks": 12,
+  "automations": 20,
+  "outputs": 40,
+  "capture_to_last_evaluation_ms": {
+    "median": 161.4196245209314,
+    "max": 164.27337500499561
+  },
+  "capture_to_all_20_alerts_ms": {
+    "median": 162.12643700418994,
+    "max": 163.8157920097001
+  },
+  "observed_evaluations_per_second": 124.7615857418969,
+  "alerts": 120,
+  "dashboard_queries": [
+    {
+      "automations": 1,
+      "warm_median_ms": 5.972209008177742,
+      "sql_statements": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "response_bytes": 3218
+    },
+    {
+      "automations": 20,
+      "warm_median_ms": 7.1812079986557364,
+      "sql_statements": [
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "response_bytes": 62023
+    }
+  ],
+  "batched_series": {
+    "fields": 20,
+    "sql_statements": 2,
+    "elapsed_ms": 9.479916014242917,
+    "response_bytes": 81225,
+    "points": 260
+  }
+}

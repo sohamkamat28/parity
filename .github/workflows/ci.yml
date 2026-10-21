@@ -1,0 +1,86 @@
+name: Parity checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  backend:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      PARITY_PROFILE: sqlite
+      PARITY_DATA_DIR: test-runtime
+      PARITY_OFFLINE: '1'
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: python -m pip install -r requirements-test.txt
+      - if: runner.os == 'Linux'
+        run: python -m playwright install --with-deps chromium
+      - if: runner.os == 'Windows'
+        run: python -m playwright install chromium
+      - run: python scripts/test.py
+      - run: python -m compileall -q parity scripts run.py cli.py
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.1-pg16
+        env:
+          POSTGRES_DB: parity_ci
+          POSTGRES_USER: parity_ci
+          POSTGRES_PASSWORD: parity_ci_ephemeral
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U parity_ci -d parity_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.cache/ms-playwright
+      PARITY_TEST_DATABASE_URL: postgresql+psycopg://parity_ci:parity_ci_ephemeral@127.0.0.1:5432/parity_ci
+      PARITY_PROFILE: sqlite
+      PARITY_DATA_DIR: test-runtime
+      PARITY_OFFLINE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: python -m pip install -r requirements-test.txt -r requirements-postgres.txt
+      - run: python scripts/test.py tests/test_jobs.py tests/test_monitoring.py tests/test_v2_integration.py tests/test_dashboard_upgrade.py tests/test_automation_expr.py tests/test_automation_runtime.py tests/test_automation_api.py tests/test_automation_evidence.py tests/test_automation_notifications.py
+      - run: python -m playwright install --with-deps chromium
+      - run: python scripts/browser_acceptance.py
+      - run: python scripts/automation_browser_acceptance.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-acceptance
+          path: |
+            docs/verification/browser-no-models.json
+            docs/verification/automation-browser.json
+            outputs/runtime/browser-*/desktop.png
+            outputs/runtime/browser-*/narrow.png
+            outputs/runtime/automation-browser-*/*.png
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: npm audit --audit-level=high
+        working-directory: frontend

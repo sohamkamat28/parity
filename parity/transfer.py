@@ -13,8 +13,10 @@ import struct
 import tempfile
 import time
 import zipfile
+from contextlib import closing
 from sqlalchemy import create_engine,select,func,inspect,text
-from .db import DB,meta,SCHEMA_VERSION
+from sqlalchemy.pool import NullPool
+from .db import DB,meta,SCHEMA_VERSION,backfill_list_items
 
 FORMAT=1
 
@@ -31,8 +33,9 @@ def resolve_sqlite(source):
 
 def _sqlite_snapshot(source,destination):
     # SQLite backup includes the WAL without changing the original database.
-    with sqlite3.connect(source.as_uri()+'?mode=ro',uri=True,timeout=30) as original:
-        with sqlite3.connect(destination) as copied:original.backup(copied)
+    with closing(sqlite3.connect(source.as_uri()+'?mode=ro',uri=True,timeout=30)) as original:
+        with closing(sqlite3.connect(destination)) as copied:
+            with copied:original.backup(copied)
 
 
 def _plain(value):
@@ -85,7 +88,7 @@ def backup_database(database_url,data_dir,destination):
     data=Path(data_dir).resolve();destination=Path(destination).resolve()
     if destination.exists():raise ValueError('Backup destination already exists; choose a new filename')
     destination.parent.mkdir(parents=True,exist_ok=True)
-    engine=create_engine(database_url)
+    engine=create_engine(database_url,poolclass=NullPool)
     archive_temp=None
     try:
         with tempfile.TemporaryDirectory(prefix='parity-backup-',dir=destination.parent) as temporary:
@@ -94,7 +97,7 @@ def backup_database(database_url,data_dir,destination):
                 source=Path(engine.url.database).resolve()
                 engine.dispose();snapshot=temporary/'snapshot.sqlite'
                 _sqlite_snapshot(source,snapshot)
-                engine=create_engine('sqlite:///'+str(snapshot))
+                engine=create_engine('sqlite:///'+str(snapshot),poolclass=NullPool)
             manifest={'format':FORMAT,'created_at':time.time(),'schema_version':None,
                 'database':engine.dialect.name,'vector_representation':'float32','tables':{},'files':{}}
             archive_temp=temporary/'backup.zip';references=set()
@@ -113,15 +116,15 @@ def backup_database(database_url,data_dir,destination):
                     for table in meta.sorted_tables:
                         if table.name not in available:continue
                         checksum=hashlib.sha256();count=0
-                        columns=list(table.columns.keys())
-                        statement=select(table).order_by(*table.primary_key.columns)
+                        columns=[column['name'] for column in inspect(connection).get_columns(table.name)]
+                        statement=select(*(table.c[name] for name in columns)).order_by(*table.primary_key.columns)
                         with archive.open('tables/'+table.name+'.jsonl','w',force_zip64=True) as output:
                             rows=connection.execution_options(stream_results=True).execute(statement).mappings()
                             for row in rows:
                                 row=_row(row);encoded=_line(row);output.write(encoded);checksum.update(encoded);count+=1
                                 references.update(_references(table.name,row))
                         manifest['tables'][table.name]={'count':count,'sha256':checksum.hexdigest(),'columns':columns}
-                # Portal fixture state is a separate SQLite database; snapshot its WAL too.
+                # Preserve an existing retired auxiliary database in legacy backups; never create it.
                 portal=data/'portal.sqlite'
                 if portal.is_file():
                     portal_copy=temporary/'portal.sqlite';_sqlite_snapshot(portal,portal_copy)
@@ -169,7 +172,7 @@ def verify_backup(path):
 
 def _verify_table(connection,table,expected):
     checksum=hashlib.sha256();count=0
-    for row in connection.execute(select(table).order_by(*table.primary_key.columns)).mappings():
+    for row in connection.execute(select(*(table.c[name] for name in expected['columns'])).order_by(*table.primary_key.columns)).mappings():
         checksum.update(_line(row));count+=1
     if count!=expected['count'] or checksum.hexdigest()!=expected['sha256']:
         raise ValueError('Restored table verification failed: '+table.name)
@@ -214,6 +217,7 @@ def restore_database(archive_path,target_url,target_data):
                         SELECT ch.id,p.source_id,p.id,v.id,ch.text,ch.heading,ch.locator,ec.signature,ec.vector
                         FROM chunks ch JOIN versions v ON ch.version_id=v.id JOIN pages p ON v.page_id=p.id
                         JOIN embedding_cache ec ON ch.cache_id=ec.id WHERE v.indexed_at IS NOT NULL''')
+                if 'monitor_list_items' not in manifest['tables']:backfill_list_items(connection)
                 _reset_runtime(connection)
                 if database.engine.dialect.name=='postgresql':
                     # Restore explicitly supplied event IDs before repairing SERIAL sequences.
@@ -237,6 +241,11 @@ def restore_database(archive_path,target_url,target_data):
 
 
 def _reset_runtime(connection):
+    from . import automation_schema as automation
+    # Connections are deliberately outside database backups. Never replay saved
+    # outbound side effects automatically, even on the same device.
+    connection.execute(automation.automation_deliveries.update().where(automation.automation_deliveries.c.status.in_(['queued','running'])).values(status='disabled',owner=None,lease_until=0,error='Restored delivery disabled; reconfigure and explicitly enable a new action.'))
+    connection.execute(automation.automation_jobs.update().where(automation.automation_jobs.c.status=='running').values(status='queued',owner=None,lease_until=0,generation=automation.automation_jobs.c.generation+1))
     # Keep frozen configurations, progress and evidence. Only process ownership is obsolete.
     from .job_schema import url_jobs,index_jobs,origin_locks,resource_locks,worker_status,run_state
     from .db import sources,runs

@@ -1,8 +1,11 @@
 """Download a pinned, CPU-only local model runtime. No account or API key needed."""
-import hashlib, sys, urllib.request, zipfile, zlib
+import hashlib, sys, urllib.request, zipfile, zlib, tarfile, platform
+import os, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-CACHE=ROOT/'.cache'/'local-chat'
+sys.path.insert(0,str(ROOT))
+from parity import config
+CACHE=config.CACHE/'local-chat'
 RUNTIME_URL='https://github.com/ggml-org/llama.cpp/releases/download/b11642/llama-b11642-bin-win-cpu-x64.zip'
 RUNTIME_SHA='0145f328421169f96b79a42ee27df8403df2276f1d94c7a82fea61901acec38f'
 MODEL_URL='https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf'
@@ -29,18 +32,43 @@ def download(url,path,expected):
     if digest(temporary)!=expected:raise RuntimeError('Download checksum mismatch: '+path.name)
     temporary.replace(path)
 
+def install_mac_runtime(archive, runtime):
+    # Never truncate a mapped Mach-O file: macOS caches signatures by inode.
+    # Re-running setup must also leave an already running server intact.
+    with tempfile.TemporaryDirectory(prefix='runtime-install-', dir=runtime.parent) as folder:
+        staging=Path(folder)
+        with tarfile.open(archive) as packaged:packaged.extractall(staging,filter='data')
+        for source in staging.rglob('*'):
+            destination=runtime/source.relative_to(staging)
+            if source.is_symlink() or source.is_file():
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                os.replace(source,destination)
+            elif source.is_dir():destination.mkdir(parents=True,exist_ok=True)
+
 def main():
-    if sys.platform!='win32':raise SystemExit('Bundled local chat setup currently targets Windows x64.')
+    mac = sys.platform=='darwin' and platform.machine()=='arm64'
+    if sys.platform!='win32' and not mac:raise SystemExit('Use a native llama-server on PATH or PARITY_LLAMA_SERVER, and place the verified GGUF in PARITY_CACHE_DIR/local-chat. Bundled runtime downloads support Windows x64 and macOS arm64.')
     CACHE.mkdir(parents=True,exist_ok=True)
-    archive=CACHE/'runtime.zip';download(RUNTIME_URL,archive,RUNTIME_SHA)
+    archive=CACHE/('runtime.tar.gz' if mac else 'runtime.zip')
+    url='https://github.com/ggml-org/llama.cpp/releases/download/b11642/llama-b11642-bin-macos-arm64.tar.gz' if mac else RUNTIME_URL
+    sha='9b08d85971cafd4fc41f3a07727e7a7ebf05c25c423ad556be300bcb7cf0df1d' if mac else RUNTIME_SHA
+    download(url,archive,sha)
     runtime=CACHE/'runtime';runtime.mkdir(exist_ok=True)
-    with zipfile.ZipFile(archive) as zipped:
-        for info in zipped.infolist():
-            destination=(runtime/info.filename).resolve()
-            if not destination.is_relative_to(runtime.resolve()):raise RuntimeError('Unsafe runtime archive path')
-            if destination.is_file() and destination.stat().st_size==info.file_size:
-                if zlib.crc32(destination.read_bytes())==info.CRC:continue
-            zipped.extract(info,runtime)
+    if mac:
+        install_mac_runtime(archive,runtime)
+    else:
+        with zipfile.ZipFile(archive) as zipped:
+            for info in zipped.infolist():
+                destination=(runtime/info.filename).resolve()
+                if not destination.is_relative_to(runtime.resolve()):raise RuntimeError('Unsafe runtime archive path')
+                if destination.is_file() and destination.stat().st_size==info.file_size:
+                    if zlib.crc32(destination.read_bytes())==info.CRC:continue
+                zipped.extract(info,runtime)
+    executable=next(runtime.rglob('llama-server' if mac else 'llama-server.exe'))
+    probe=subprocess.run([str(executable),'--version'],capture_output=True,timeout=30)
+    if probe.returncode:
+        raise RuntimeError(f'Local answer runtime failed its startup check (exit {probe.returncode}). '
+                           'Re-run setup before starting Parity; monitoring can run without models.')
     download(MODEL_URL,CACHE/'qwen2.5-1.5b-instruct-q4_k_m.gguf',MODEL_SHA)
     print('Free local chat is installed and checksums are verified.',flush=True)
 

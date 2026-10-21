@@ -4,6 +4,8 @@
 !.env.example
 *.pem
 *.key
+automation-connections.json
+.connections-*
 # Runtime data and downloaded dependencies
 .venv/
 venv/
@@ -23,4 +25,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.tsbuildinfo
+.DS_Store
+outputs/*.zip
+outputs/*.manifest.json
+outputs/runtime/
 # Compiled frontend is intentionally tracked

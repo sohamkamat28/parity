@@ -1,0 +1,28 @@
+{
+  "models": "enabled",
+  "checks": [
+    "Settings UI, retired sample endpoints and legacy static app are absent",
+    "Automatic URL/instructions setup creates scalar/table/list widgets and opens Dashboard without selectors or layout steps",
+    "Frequency entered during automatic setup is saved; later schedule edits persist",
+    "Dashboard zero/currency/table/list rendering and normal source inclusion with PostgreSQL",
+    "Inline time-series, ranges, keyboard evidence links, accessible data table and first-observed announcement dates",
+    "Scheduled changes delivered by SSE without chat or Check now; immutable original evidence retained",
+    "Unrelated page changes advance verification without field changes; evidence panel and pinned layout preserved",
+    "Failed HTTP check retains previous verified value and warning; next successful check recovers",
+    "Polling fallback delivers scheduled announcement updates",
+    "390px layout, keyboard navigation, focus management and reduced-motion setting",
+    "Scheduled monitoring continues with browser tab closed; layout persists",
+    "Automatically selects Chromium for a JavaScript-only price and validates baseline before activation",
+    "Source-grouped overview combines multiple monitors, keeps fields with their website, and preserves filters, hiding, pins, source-local ordering without dropping other-source preferences, keyboard details and history at desktop/390px",
+    "Native free Qwen chat selects immutable evidence with shared MiniLM available",
+    "Remove/restore UI retains immutable evidence, hides active source and restores with monitoring paused"
+  ],
+  "screenshots": [
+    "outputs/runtime/browser-7fbe598a35e0449da9d81f60972c0192/desktop.png",
+    "outputs/runtime/browser-7fbe598a35e0449da9d81f60972c0192/narrow.png",
+    "outputs/runtime/browser-7fbe598a35e0449da9d81f60972c0192/source-grouped.png",
+    "outputs/runtime/browser-7fbe598a35e0449da9d81f60972c0192/source-grouped-narrow.png"
+  ],
+  "console_errors": [],
+  "status": "passed"
+}

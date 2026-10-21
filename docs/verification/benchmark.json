@@ -1,0 +1,978 @@
+{
+  "profile": "postgresql",
+  "embedding": "minilm",
+  "model_signature": "minilm:1110a243fdf4706b3f48f1d95db1a4f5529b4d41:mean:normalized:384:v1",
+  "cache_definition": "First client = first retrieval after ingestion; warm = repeated queries. OS/database cache flushing was not performed.",
+  "throughput_scope": "Batch embeddings and projection insertion, including HNSW maintenance; excludes fetching and document extraction.",
+  "results": [
+    {
+      "documents": 100,
+      "chunks": 1000,
+      "unique_vectors": 901,
+      "unique_embedding_inputs": 901,
+      "reused_embeddings": 99,
+      "embedding_seconds": 1.5047830830008024,
+      "ingestion_seconds": 2.4030932919995394,
+      "ingestion_chunks_per_second": 416.13032807724704,
+      "database_bytes": 17277455,
+      "first_client": {
+        "clients": 1,
+        "queries": 1,
+        "p50_ms": 40.921959007391706,
+        "p95_ms": 40.921959007391706,
+        "max_ms": 40.921959007391706,
+        "target_document_hit_at_10": 1
+      },
+      "warm": [
+        {
+          "clients": 1,
+          "queries": 20,
+          "p50_ms": 38.78952049126383,
+          "p95_ms": 41.327208004076965,
+          "max_ms": 52.373790997080505,
+          "target_document_hit_at_10": 1,
+          "mode": "exact_hybrid"
+        },
+        {
+          "clients": 1,
+          "queries": 20,
+          "p50_ms": 38.74704150803154,
+          "p95_ms": 43.240499988314696,
+          "max_ms": 45.56437500286847,
+          "target_document_hit_at_10": 1,
+          "mode": "hnsw_hybrid",
+          "recall_at_10_vs_exact": 1.0
+        },
+        {
+          "clients": 5,
+          "queries": 20,
+          "p50_ms": 71.23277099890402,
+          "p95_ms": 91.21241599495988,
+          "max_ms": 107.7152079960797,
+          "target_document_hit_at_10": 1,
+          "mode": "exact_hybrid"
+        },
+        {
+          "clients": 5,
+          "queries": 20,
+          "p50_ms": 77.95574999181554,
+          "p95_ms": 92.70804200787097,
+          "max_ms": 100.36608300288208,
+          "target_document_hit_at_10": 1,
+          "mode": "hnsw_hybrid",
+          "recall_at_10_vs_exact": 1.0
+        }
+      ],
+      "ann_plan_uses_hnsw": false,
+      "ann_plan": [
+        {
+          "Plan": {
+            "Node Type": "Nested Loop",
+            "Plans": [
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Relation Name": "search_projection"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Seq Scan",
+                            "Relation Name": "sources"
+                          },
+                          {
+                            "Node Type": "Nested Loop",
+                            "Plans": [
+                              {
+                                "Node Type": "Hash Join",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Hash Join",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Seq Scan",
+                                        "Relation Name": "search_projection"
+                                      },
+                                      {
+                                        "Node Type": "Hash",
+                                        "Plans": [
+                                          {
+                                            "Node Type": "Seq Scan",
+                                            "Relation Name": "pages"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Node Type": "Hash",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "CTE Scan"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Index Scan",
+                                "Index Name": "versions_pkey",
+                                "Relation Name": "versions"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Aggregate",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Plans": [
+                      {
+                        "Node Type": "CTE Scan"
+                      },
+                      {
+                        "Node Type": "Subquery Scan",
+                        "Plans": [
+                          {
+                            "Node Type": "Limit",
+                            "Plans": [
+                              {
+                                "Node Type": "Aggregate",
+                                "Plans": [
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Sort",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Result",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Nested Loop",
+                                        "Plans": [
+                                          {
+                                            "Node Type": "Seq Scan",
+                                            "Relation Name": "sources"
+                                          },
+                                          {
+                                            "Node Type": "Nested Loop",
+                                            "Plans": [
+                                              {
+                                                "Node Type": "Hash Join",
+                                                "Plans": [
+                                                  {
+                                                    "Node Type": "Seq Scan",
+                                                    "Relation Name": "search_projection"
+                                                  },
+                                                  {
+                                                    "Node Type": "Hash",
+                                                    "Plans": [
+                                                      {
+                                                        "Node Type": "Seq Scan",
+                                                        "Relation Name": "pages"
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              {
+                                                "Node Type": "Index Scan",
+                                                "Index Name": "versions_pkey",
+                                                "Relation Name": "versions"
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Nested Loop",
+                            "Plans": [
+                              {
+                                "Node Type": "Hash Join",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Seq Scan",
+                                    "Relation Name": "search_projection"
+                                  },
+                                  {
+                                    "Node Type": "Hash",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Seq Scan",
+                                        "Relation Name": "versions"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Index Scan",
+                                "Index Name": "pages_pkey",
+                                "Relation Name": "pages"
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Seq Scan",
+                            "Relation Name": "sources"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Nested Loop",
+                "Plans": [
+                  {
+                    "Node Type": "Nested Loop",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Aggregate",
+                            "Plans": [
+                              {
+                                "Node Type": "Append",
+                                "Plans": [
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  },
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Index Scan",
+                            "Index Name": "search_projection_pkey",
+                            "Relation Name": "search_projection"
+                          }
+                        ]
+                      },
+                      {
+                        "Node Type": "Index Scan",
+                        "Index Name": "pages_pkey",
+                        "Relation Name": "pages"
+                      }
+                    ]
+                  },
+                  {
+                    "Node Type": "Index Scan",
+                    "Index Name": "versions_pkey",
+                    "Relation Name": "versions"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Index Scan",
+                "Index Name": "sources_pkey",
+                "Relation Name": "sources"
+              },
+              {
+                "Node Type": "CTE Scan"
+              },
+              {
+                "Node Type": "CTE Scan"
+              }
+            ]
+          }
+        }
+      ],
+      "process_peak_rss_bytes": 123273216
+    },
+    {
+      "documents": 1000,
+      "chunks": 10000,
+      "unique_vectors": 9001,
+      "unique_embedding_inputs": 9001,
+      "reused_embeddings": 999,
+      "embedding_seconds": 14.744868958980078,
+      "ingestion_seconds": 24.489973625008133,
+      "ingestion_chunks_per_second": 408.3303703434135,
+      "database_bytes": 81871375,
+      "first_client": {
+        "clients": 1,
+        "queries": 1,
+        "p50_ms": 137.40804100234527,
+        "p95_ms": 137.40804100234527,
+        "max_ms": 137.40804100234527,
+        "target_document_hit_at_10": 1
+      },
+      "warm": [
+        {
+          "clients": 1,
+          "queries": 20,
+          "p50_ms": 123.71983350021765,
+          "p95_ms": 127.4104579933919,
+          "max_ms": 129.0302499983227,
+          "target_document_hit_at_10": 1,
+          "mode": "exact_hybrid"
+        },
+        {
+          "clients": 1,
+          "queries": 20,
+          "p50_ms": 120.37210450216662,
+          "p95_ms": 124.71745799120981,
+          "max_ms": 128.64062500011642,
+          "target_document_hit_at_10": 1,
+          "mode": "hnsw_hybrid",
+          "recall_at_10_vs_exact": 0.995
+        },
+        {
+          "clients": 5,
+          "queries": 20,
+          "p50_ms": 157.35025000321912,
+          "p95_ms": 178.76045899174642,
+          "max_ms": 181.09291700238828,
+          "target_document_hit_at_10": 1,
+          "mode": "exact_hybrid"
+        },
+        {
+          "clients": 5,
+          "queries": 20,
+          "p50_ms": 150.52770799957216,
+          "p95_ms": 176.13233299925923,
+          "max_ms": 178.55620800401084,
+          "target_document_hit_at_10": 1,
+          "mode": "hnsw_hybrid",
+          "recall_at_10_vs_exact": 0.995
+        }
+      ],
+      "ann_plan_uses_hnsw": true,
+      "ann_plan": [
+        {
+          "Plan": {
+            "Node Type": "Nested Loop",
+            "Plans": [
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Index Name": "ix_projection_hnsw",
+                    "Relation Name": "search_projection"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Nested Loop",
+                            "Plans": [
+                              {
+                                "Node Type": "Hash Join",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Nested Loop",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Aggregate",
+                                        "Plans": [
+                                          {
+                                            "Node Type": "CTE Scan"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "Node Type": "Index Scan",
+                                        "Index Name": "search_projection_pkey",
+                                        "Relation Name": "search_projection"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Node Type": "Hash",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Seq Scan",
+                                        "Relation Name": "pages"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Index Scan",
+                                "Index Name": "versions_pkey",
+                                "Relation Name": "versions"
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Seq Scan",
+                            "Relation Name": "sources"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Aggregate",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Plans": [
+                      {
+                        "Node Type": "CTE Scan"
+                      },
+                      {
+                        "Node Type": "Subquery Scan",
+                        "Plans": [
+                          {
+                            "Node Type": "Limit",
+                            "Plans": [
+                              {
+                                "Node Type": "Aggregate",
+                                "Plans": [
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Sort",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Result",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Nested Loop",
+                                        "Plans": [
+                                          {
+                                            "Node Type": "Seq Scan",
+                                            "Relation Name": "sources"
+                                          },
+                                          {
+                                            "Node Type": "Nested Loop",
+                                            "Plans": [
+                                              {
+                                                "Node Type": "Hash Join",
+                                                "Plans": [
+                                                  {
+                                                    "Node Type": "Seq Scan",
+                                                    "Relation Name": "search_projection"
+                                                  },
+                                                  {
+                                                    "Node Type": "Hash",
+                                                    "Plans": [
+                                                      {
+                                                        "Node Type": "Seq Scan",
+                                                        "Relation Name": "pages"
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              {
+                                                "Node Type": "Index Scan",
+                                                "Index Name": "versions_pkey",
+                                                "Relation Name": "versions"
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Nested Loop",
+                            "Plans": [
+                              {
+                                "Node Type": "Hash Join",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Seq Scan",
+                                    "Relation Name": "search_projection"
+                                  },
+                                  {
+                                    "Node Type": "Hash",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Seq Scan",
+                                        "Relation Name": "versions"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Index Scan",
+                                "Index Name": "pages_pkey",
+                                "Relation Name": "pages"
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Seq Scan",
+                            "Relation Name": "sources"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Nested Loop",
+                "Plans": [
+                  {
+                    "Node Type": "Nested Loop",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Aggregate",
+                            "Plans": [
+                              {
+                                "Node Type": "Append",
+                                "Plans": [
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  },
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Index Scan",
+                            "Index Name": "search_projection_pkey",
+                            "Relation Name": "search_projection"
+                          }
+                        ]
+                      },
+                      {
+                        "Node Type": "Index Scan",
+                        "Index Name": "pages_pkey",
+                        "Relation Name": "pages"
+                      }
+                    ]
+                  },
+                  {
+                    "Node Type": "Index Scan",
+                    "Index Name": "versions_pkey",
+                    "Relation Name": "versions"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Relation Name": "sources"
+              },
+              {
+                "Node Type": "CTE Scan"
+              },
+              {
+                "Node Type": "CTE Scan"
+              }
+            ]
+          }
+        }
+      ],
+      "process_peak_rss_bytes": 132956160
+    },
+    {
+      "documents": 5000,
+      "chunks": 50000,
+      "unique_vectors": 45001,
+      "unique_embedding_inputs": 45001,
+      "reused_embeddings": 4999,
+      "embedding_seconds": 83.43813999895065,
+      "ingestion_seconds": 158.10430229200574,
+      "ingestion_chunks_per_second": 316.2469286107982,
+      "database_bytes": 355844623,
+      "first_client": {
+        "clients": 1,
+        "queries": 1,
+        "p50_ms": 1173.0931669881102,
+        "p95_ms": 1173.0931669881102,
+        "max_ms": 1173.0931669881102,
+        "target_document_hit_at_10": 1
+      },
+      "warm": [
+        {
+          "clients": 1,
+          "queries": 20,
+          "p50_ms": 709.6743959918967,
+          "p95_ms": 803.4762919996865,
+          "max_ms": 808.7014589982573,
+          "target_document_hit_at_10": 1,
+          "mode": "exact_hybrid"
+        },
+        {
+          "clients": 1,
+          "queries": 20,
+          "p50_ms": 459.1242499955115,
+          "p95_ms": 476.1582500068471,
+          "max_ms": 477.8764999937266,
+          "target_document_hit_at_10": 1,
+          "mode": "hnsw_hybrid",
+          "recall_at_10_vs_exact": 1.0
+        },
+        {
+          "clients": 5,
+          "queries": 20,
+          "p50_ms": 1282.8311039993423,
+          "p95_ms": 1530.6342499970924,
+          "max_ms": 1564.2182500014314,
+          "target_document_hit_at_10": 1,
+          "mode": "exact_hybrid"
+        },
+        {
+          "clients": 5,
+          "queries": 20,
+          "p50_ms": 1099.3106454989174,
+          "p95_ms": 1175.7828749978216,
+          "max_ms": 1205.6977909960551,
+          "target_document_hit_at_10": 1,
+          "mode": "hnsw_hybrid",
+          "recall_at_10_vs_exact": 1.0
+        }
+      ],
+      "ann_plan_uses_hnsw": true,
+      "ann_plan": [
+        {
+          "Plan": {
+            "Node Type": "Nested Loop",
+            "Plans": [
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Index Name": "ix_projection_hnsw",
+                    "Relation Name": "search_projection"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Nested Loop",
+                            "Plans": [
+                              {
+                                "Node Type": "Nested Loop",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Nested Loop",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Aggregate",
+                                        "Plans": [
+                                          {
+                                            "Node Type": "CTE Scan"
+                                          }
+                                        ]
+                                      },
+                                      {
+                                        "Node Type": "Index Scan",
+                                        "Index Name": "search_projection_pkey",
+                                        "Relation Name": "search_projection"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "Node Type": "Index Scan",
+                                    "Index Name": "pages_pkey",
+                                    "Relation Name": "pages"
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Index Scan",
+                                "Index Name": "versions_pkey",
+                                "Relation Name": "versions"
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Seq Scan",
+                            "Relation Name": "sources"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Aggregate",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Plans": [
+                      {
+                        "Node Type": "CTE Scan"
+                      },
+                      {
+                        "Node Type": "Subquery Scan",
+                        "Plans": [
+                          {
+                            "Node Type": "Limit",
+                            "Plans": [
+                              {
+                                "Node Type": "Aggregate",
+                                "Plans": [
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Sort",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Result",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Nested Loop",
+                                        "Plans": [
+                                          {
+                                            "Node Type": "Seq Scan",
+                                            "Relation Name": "sources"
+                                          },
+                                          {
+                                            "Node Type": "Nested Loop",
+                                            "Plans": [
+                                              {
+                                                "Node Type": "Hash Join",
+                                                "Plans": [
+                                                  {
+                                                    "Node Type": "Seq Scan",
+                                                    "Relation Name": "search_projection"
+                                                  },
+                                                  {
+                                                    "Node Type": "Hash",
+                                                    "Plans": [
+                                                      {
+                                                        "Node Type": "Seq Scan",
+                                                        "Relation Name": "pages"
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              },
+                                              {
+                                                "Node Type": "Index Scan",
+                                                "Index Name": "versions_pkey",
+                                                "Relation Name": "versions"
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Limit",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Nested Loop",
+                            "Plans": [
+                              {
+                                "Node Type": "Hash Join",
+                                "Plans": [
+                                  {
+                                    "Node Type": "Seq Scan",
+                                    "Relation Name": "search_projection"
+                                  },
+                                  {
+                                    "Node Type": "Hash",
+                                    "Plans": [
+                                      {
+                                        "Node Type": "Seq Scan",
+                                        "Relation Name": "versions"
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "Node Type": "Index Scan",
+                                "Index Name": "pages_pkey",
+                                "Relation Name": "pages"
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Seq Scan",
+                            "Relation Name": "sources"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Node Type": "Nested Loop",
+                "Plans": [
+                  {
+                    "Node Type": "Nested Loop",
+                    "Plans": [
+                      {
+                        "Node Type": "Nested Loop",
+                        "Plans": [
+                          {
+                            "Node Type": "Aggregate",
+                            "Plans": [
+                              {
+                                "Node Type": "Append",
+                                "Plans": [
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  },
+                                  {
+                                    "Node Type": "CTE Scan"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "Node Type": "Index Scan",
+                            "Index Name": "search_projection_pkey",
+                            "Relation Name": "search_projection"
+                          }
+                        ]
+                      },
+                      {
+                        "Node Type": "Index Scan",
+                        "Index Name": "pages_pkey",
+                        "Relation Name": "pages"
+                      }
+                    ]
+                  },
+                  {
+                    "Node Type": "Index Scan",
+                    "Index Name": "versions_pkey",
+                    "Relation Name": "versions"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Relation Name": "sources"
+              },
+              {
+                "Node Type": "CTE Scan"
+              },
+              {
+                "Node Type": "CTE Scan"
+              }
+            ]
+          }
+        }
+      ],
+      "process_peak_rss_bytes": 132956160
+    }
+  ],
+  "shared_model_startup_seconds": 4.07749383400369,
+  "largest_child_peak_rss_bytes": 584712192,
+  "memory_scope": "Harness peak RSS per corpus; largest child peak is the maximum of shared embedding and benchmark processes, not their sum. Docker is separate."
+}

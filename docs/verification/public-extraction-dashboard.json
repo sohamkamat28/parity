@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+    "status": "passed",
+    "rendering": "static",
+    "fields": [
+      {
+        "name": "Current price \u2014 A Light in the Attic",
+        "value": "51.77",
+        "unit": "GBP"
+      }
+    ]
+  },
+  {
+    "url": "https://example.org/",
+    "status": "passed",
+    "rendering": "static",
+    "fields": [
+      {
+        "name": "This domain is for use in documentation examples without needing permi",
+        "value": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+        "unit": ""
+      }
+    ]
+  }
+]

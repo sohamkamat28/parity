@@ -15,8 +15,8 @@ def portal(tmp_path_factory):
     sock=socket.socket();sock.bind(("127.0.0.1",0));port=sock.getsockname()[1];sock.close()
     base=f"http://127.0.0.1:{port}"
     env=os.environ.copy()
-    env.update(PARITY_DATA_DIR=str(root),DEMO_ORIGIN=base,DEMO_ADMIN_TOKEN="test-demo-only")
-    proc=subprocess.Popen([sys.executable,"-m","uvicorn","mock_portal.app:app","--host","127.0.0.1","--port",str(port)],
+    env.update(PARITY_DATA_DIR=str(root),PARITY_FIXTURE_ORIGIN=base,PARITY_FIXTURE_TOKEN="test-fixture-only")
+    proc=subprocess.Popen([sys.executable,"-m","uvicorn","tests.support.fixture_site:app","--host","127.0.0.1","--port",str(port)],
         env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
     client=httpx.Client(base_url=base,trust_env=False,timeout=15)
     for _ in range(100):
@@ -32,17 +32,17 @@ def portal(tmp_path_factory):
 @pytest.fixture
 def system(tmp_path,monkeypatch,portal):
     base,client=portal
-    monkeypatch.setattr(config,"DEMO_ORIGIN",base)
+
     monkeypatch.setattr(config,"DATA",tmp_path)
-    client.post("/admin/reset",headers={"X-Demo-Token":"test-demo-only"}).raise_for_status()
+    client.post("/admin/reset",headers={"X-Fixture-Token":"test-fixture-only"}).raise_for_status()
     s=Service(DB("sqlite:///"+str(tmp_path/"test.db")),Embedder("lexical"),Fetcher(base))
-    source=s.seed_demo()
+    source=s.add_source('Lifecycle fixture',base+'/en/circulars/',{'allow':['/en/'],'deny':['/admin','/test'],'seeds':[base+'/en/circulars/',base+'/en/sitemap.xml'],'discovery_only':['/en/','/en/circulars/','/en/sitemap.xml'],'selector':'article','delay':0,'interval':60,'missing_interval':2})
     with s.db.tx() as c:
         cfg={**source["config"],"missing_interval":0}
         c.execute(sources.update().where(sources.c.id==source["id"]).values(config=cfg))
     def crawl():return s.run(s.enqueue(source["id"])["id"])
     def act(name,body=None):
-        r=client.post("/admin/"+name,headers={"X-Demo-Token":"test-demo-only"},json=body)
+        r=client.post("/admin/"+name,headers={"X-Fixture-Token":"test-fixture-only"},json=body)
         r.raise_for_status();return r.json()
     return s,source,crawl,act,client
 
@@ -66,19 +66,21 @@ def test_lifecycle(system):
     assert "28 August" in s.get_page(honours["id"])["version"]["content"]
     diff=s.diff(honours["id"],1,2)["diff"]
     assert "+Registration closes on 28 August" in diff and "NOC" in diff
-    now=s.search("honours registration deadline")
+    now=s.search("honours registration deadline",source_ids=[src["id"]])
+    assert any(r["page_id"]==honours["id"] for r in now["results"])
     assert all(r["number"]==2 for r in now["results"] if r["page_id"]==honours["id"])
-    past=s.search("honours registration deadline",mode="as_of",as_of=t1)
+    past=s.search("honours registration deadline",source_ids=[src["id"]],mode="as_of",as_of=t1)
+    assert any(r["page_id"]==honours["id"] for r in past["results"])
     assert all(r["number"]==1 for r in past["results"] if r["page_id"]==honours["id"])
     act("delete-scholarship")
     first=crawl();assert first["metrics"]["missing"]==1
     gap=time.time()
-    assert not any(r["page_id"]==scholarship["id"] for r in s.search("scholarship renewal")["results"])
+    assert not any(r["page_id"]==scholarship["id"] for r in s.search("scholarship renewal",source_ids=[src["id"]])["results"])
     crawl();last=crawl();assert last["metrics"]["deleted"]==1
     assert s.get_page(scholarship["id"])["page"]["availability"]=="deleted"
     act("restore-scholarship");restored=crawl();assert restored["metrics"]["restored"]==1
     assert s.get_page(scholarship["id"])["version"]["number"]==2
-    historical=s.search("scholarship renewal",mode="as_of",as_of=gap)
+    historical=s.search("scholarship renewal",source_ids=[src["id"]],mode="as_of",as_of=gap)
     assert not any(r["page_id"]==scholarship["id"] for r in historical["results"])
     act("add-notice");added=crawl();assert added["metrics"]["created"]==2,added
     pdf=next(p for p in s.overview()["pages"] if p["url"].endswith(".pdf"))
@@ -117,7 +119,7 @@ def test_duplicate_jobs_and_disabled_source(system):
     s.run(a["id"]);s.run(a["id"])
     assert len(s.db.all(select(versions)))==3
     s.set_source(src["id"],enabled=False)
-    assert s.search("honours")["results"]==[]
+    assert s.search("honours",source_ids=[src["id"]])["results"]==[]
     with pytest.raises(ValueError):s.enqueue(src["id"])
 
 def test_missing_recovery_and_reversion(system):
@@ -155,8 +157,8 @@ def test_url_scope_and_private_addresses(system):
     with pytest.raises(ValueError):canonical("http://name:password@example.org/")
     with pytest.raises(ValueError):s.add_source("unsafe","http://127.0.0.1:5432/")
     with pytest.raises(ValueError):s.add_source("unsafe","http://169.254.169.254/")
-    with pytest.raises(ValueError):s.add_source("fake demo","http://127.0.0.1:5432/",{"demo":True})
-    with pytest.raises(ValueError):s.add_source("too large",src["root_url"],{"demo":True,"max_bytes":20*1024*1024})
+    with pytest.raises(ValueError):s.add_source("private destination","http://127.0.0.1:5432/",{})
+    with pytest.raises(ValueError):s.add_source("too large",src["root_url"],{"max_bytes":20*1024*1024})
 
 def test_extraction_preserves_meaning():
     a=b'<html><title>Rule</title><article><h1>Notice</h1><h2>Date</h2><p>20 August. Do NOT pay.</p><p><a href="/a">form</a></p></article><footer>clock 1</footer></html>'
@@ -171,8 +173,8 @@ def test_extraction_preserves_meaning():
 
 def test_no_answer_and_invalid_history(system):
     s,src,crawl,act,client=system;crawl()
-    assert s.search("zzqnonexistentwords")["results"]==[]
-    assert s.search("honours",mode="as_of",as_of=1)["results"]==[]
+    assert s.search("zzqnonexistentwords",source_ids=[src["id"]])["results"]==[]
+    assert s.search("honours",source_ids=[src["id"]],mode="as_of",as_of=1)["results"]==[]
     with pytest.raises(ValueError):s.search("honours",mode="as_of")
     with pytest.raises(ValueError):s.get_page("unknown",1)
 
@@ -195,16 +197,17 @@ def test_generic_layouts_and_scope(tmp_path,monkeypatch):
     server=ThreadingHTTPServer(("127.0.0.1",0),Handler)
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     base=f"http://127.0.0.1:{server.server_port}"
-    monkeypatch.setattr(config,"DEMO_ORIGIN",base);monkeypatch.setattr(config,"DATA",tmp_path)
+    monkeypatch.setattr(config,"DATA",tmp_path)
     try:
         s=Service(DB("sqlite:///"+str(tmp_path/"generic.db")),Embedder("lexical"),Fetcher(base))
-        src=s.add_source("Developer docs",base+"/docs/",{"demo":True,"allow":["/docs/"],
+        src=s.add_source("Developer docs",base+"/docs/",{"allow":["/docs/"],
             "discovery_only":["/docs/"],"delay":0})
         result=s.run(s.enqueue(src["id"])["id"])
         assert result["metrics"]["created"]==2,result
         assert all("/docs/" in p["url"] for p in s.overview()["pages"])
         assert any("Authorization" in r["text"] for r in s.search("API authentication token")["results"])
-        assert any("100 per minute" in r["text"] for r in s.search("request limit")["results"])
+        assert any("Authorization" in r["text"] for r in s.search("API authentication token",source_ids=[src['id']])["results"])
+        assert any("100 per minute" in r["text"] for r in s.search("request limit",source_ids=[src['id']])["results"])
     finally:server.shutdown();server.server_close()
 
 def test_worker_recovers_abandoned_job(system):

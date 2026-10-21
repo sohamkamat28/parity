@@ -16,10 +16,10 @@ from sqlalchemy import create_engine, inspect, select
 
 from parity import browser, config
 from parity.browser_worker import BudgetFetcher
-from parity.db import DB, meta, schema, sources, pages, versions, runs, chat_messages, chat_conversations, demo_sessions
+from parity.db import DB, meta, schema, sources, pages, versions, runs, chat_messages, chat_conversations
 from parity.embedding import Embedder
 from parity.fetch import Fetcher, FetchError, Response, in_scope, resource_in_scope
-from parity.operations import DemoService, run_observations
+from parity.operations import run_observations
 from parity.service import Service
 
 
@@ -68,12 +68,12 @@ def web_fixture(tmp_path,monkeypatch):
     server=ThreadingHTTPServer(("127.0.0.1",0),Handler)
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     base=f"http://127.0.0.1:{server.server_port}"
-    monkeypatch.setattr(config,"DEMO_ORIGIN",base)
+
     monkeypatch.setattr(config,"DATA",tmp_path)
     service=Service(DB("sqlite:///"+str(tmp_path/"release.db")),Embedder("lexical"),Fetcher(base))
     def source(path="/docs/live",**settings):
         return service.add_source("Independent site",base+path,{
-            "demo":True,"allow":["/docs/"],"deny":["/admin"],"max_depth":0,
+            "allow":["/docs/"],"deny":["/admin"],"max_depth":0,
             "render_mode":"browser","ready_selector":'article[data-ready="true"]',
             "selector":"article","delay":0,**settings})
     yield service,source,state,base
@@ -111,7 +111,8 @@ def test_browser_json_changes_with_constant_html_and_immutable_artifacts(web_fix
     assert not any(state["conditional"]),"Rendered pages must not use the HTML shell's ETag shortcut"
     assert ("GET","/assets/live.js") in state["requests"]
     assert ("GET","/api/grant") in state["requests"]
-    assert "25 November" in service.search("grant application deadline")["results"][0]["text"]
+    assert any("25 November" in r["text"] for r in service.search("grant application deadline")["results"])
+    assert "25 November" in service.search("grant application deadline",source_ids=[source['id']])["results"][0]["text"]
 
 
 def test_browser_resource_failure_retains_verified_version(web_fixture):
@@ -267,11 +268,32 @@ def test_model_warmup_precedes_lease_and_heartbeat_survives_slow_encoding(web_fi
         return real_model()
     monkeypatch.setattr(service,"model",model)
     monkeypatch.setattr(config,"LEASE_SECONDS",.8)
+    # Advance lease time explicitly so Windows runner scheduling cannot consume a
+    # subsecond lease. The actual heartbeat thread must still renew it twice.
+    from types import SimpleNamespace
+    import parity.service as service_module
+    clock=[time.time()];renewals=[]
+    monkeypatch.setattr(service_module,'time',SimpleNamespace(time=lambda:clock[0],sleep=time.sleep))
     encode=service.embedder.encode
-    def slow_encode(text):time.sleep(1.3);return encode(text)
+    def wait_for_renewal(previous):
+        deadline=time.monotonic()+10
+        while time.monotonic()<deadline:
+            lease=service.source(source['id'])['lease_until']
+            if lease>previous:return lease
+            time.sleep(.02)
+        raise AssertionError('Heartbeat did not renew the held lease')
+    def slow_encode(text):
+        original=service.source(source['id'])['lease_until']
+        clock[0]+=.3
+        renewed=wait_for_renewal(original)
+        clock[0]=original+.1
+        assert clock[0]<renewed
+        renewed_again=wait_for_renewal(renewed)
+        renewals.append(renewed_again)
+        return encode(text)
     monkeypatch.setattr(service.embedder,"encode",slow_encode)
     result=service.run(job["id"])
-    assert observed==[(0,None)]
+    assert observed==[(0,None)] and renewals
     assert result["status"]=="succeeded",result
     assert service.source(source["id"])["lease_until"]==0
 
@@ -292,7 +314,8 @@ def test_model_initialization_failure_finishes_job_without_claiming(web_fixture,
 def test_v1_database_migration_preserves_history_and_is_idempotent(tmp_path):
     target=tmp_path/"original-v1.db";url="sqlite:///"+str(target)
     old=create_engine(url)
-    excluded={"chat_conversations","chat_messages","demo_sessions"}
+    from parity.db import _V2_TABLES, _V3_TABLES, SCHEMA_VERSION
+    excluded={table.name for table in (*_V2_TABLES, *_V3_TABLES)}
     meta.create_all(old,tables=[table for table in meta.sorted_tables if table.name not in excluded])
     with old.begin() as connection:
         connection.execute(schema.insert().values(number=1))
@@ -300,15 +323,16 @@ def test_v1_database_migration_preserves_history_and_is_idempotent(tmp_path):
         connection.execute(pages.insert().values(id="existing-page",source_id="existing-source",url="https://example.org/rule",current_id="existing-version",last_version_id="existing-version"))
         connection.execute(versions.insert().values(id="existing-version",page_id="existing-page",number=1,title="Existing rule",content="Original retained evidence",hash="old-hash"))
     old.dispose()
-    upgraded=DB(url)
-    assert upgraded.one(select(schema))["number"]==2
+    with pytest.raises(RuntimeError,match="upgrade required"):DB(url)
+    upgraded=DB(url,upgrade=True)
+    assert upgraded.one(select(schema))["number"]==SCHEMA_VERSION
     assert upgraded.one(select(versions))["content"]=="Original retained evidence"
     assert upgraded.one(select(pages))["current_id"]=="existing-version"
     assert excluded.issubset(set(inspect(upgraded.engine).get_table_names()))
     upgraded.engine.dispose()
     again=DB(url)
     assert len(again.all(select(versions)))==1 and len(again.all(select(sources)))==1
-    assert again.all(select(chat_messages))==[] and again.all(select(demo_sessions))==[]
+    assert again.all(select(chat_messages))==[]
     again.engine.dispose()
 
 
@@ -324,59 +348,39 @@ def test_newer_database_schema_is_rejected_without_changes(tmp_path):
     engine.dispose()
 
 
-@pytest.fixture(scope="module")
-def namespaced_portal(tmp_path_factory):
-    root=tmp_path_factory.mktemp("release-portal")
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1",0));port=sock.getsockname()[1]
-    base=f"http://127.0.0.1:{port}"
-    env={**os.environ,"PARITY_DATA_DIR":str(root),"DEMO_ORIGIN":base,"DEMO_ADMIN_TOKEN":"release-test-token"}
-    process=subprocess.Popen([sys.executable,"-m","uvicorn","mock_portal.app:app","--host","127.0.0.1","--port",str(port)],
-        env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform=="win32" else 0)
-    client=httpx.Client(base_url=base,trust_env=False,timeout=10)
+@pytest.mark.parametrize('path,target',[('/robots.txt','robots.txt rules'),('/event/price','the website')])
+def test_fetch_timeout_reports_website_boundary(monkeypatch,path,target):
+    fetcher=Fetcher()
+    monkeypatch.setattr(fetcher,'addresses',lambda *args:['93.184.216.34'])
+    def timeout(*args,**kwargs):raise TimeoutError('private socket details')
+    monkeypatch.setattr(socket,'create_connection',timeout)
+    url='https://example.org'+path
+    with pytest.raises(FetchError,match='timed out') as caught:
+        fetcher._request(url,{'root_url':url,'config':{}},{})
+    assert target in str(caught.value) and 'device and network' in str(caught.value)
+    assert 'private socket details' not in str(caught.value)
+
+
+def test_tls_timeout_closes_connected_socket(monkeypatch):
+    from types import SimpleNamespace
+    fetcher=Fetcher();closed=[]
+    monkeypatch.setattr(fetcher,'addresses',lambda *args:['93.184.216.34'])
+    monkeypatch.setattr(socket,'create_connection',lambda *args,**kwargs:SimpleNamespace(close=lambda:closed.append(True),settimeout=lambda _:None))
+    def timeout(*args,**kwargs):raise TimeoutError('TLS stalled')
+    import ssl
+    monkeypatch.setattr(ssl,'create_default_context',lambda:SimpleNamespace(wrap_socket=timeout))
+    with pytest.raises(FetchError,match='timed out'):
+        fetcher._request('https://example.org',{'root_url':'https://example.org','config':{}},{})
+    assert closed==[True]
+
+
+def test_retired_sample_flag_cannot_enable_private_network_access(monkeypatch,tmp_path):
+    monkeypatch.setattr(socket,'getaddrinfo',lambda *args,**kwargs:[(socket.AF_INET,socket.SOCK_STREAM,6,'',('127.0.0.1',443))])
+    source={'root_url':'https://example.org/','config':{'demo':True}}
+    with pytest.raises(FetchError,match='Non-public'):
+        Fetcher().addresses(source['root_url'],source)
+    service=Service(DB('sqlite:///'+str(tmp_path/'source.db')),Embedder('lexical'))
     try:
-        for _ in range(100):
-            try:
-                if client.get("/health/ready").status_code==200:break
-            except httpx.HTTPError:pass
-            if process.poll() is not None:raise RuntimeError(process.stderr.read().decode())
-            time.sleep(.1)
-        else:raise RuntimeError("Fixture portal failed to become ready")
-        yield base,client
-    finally:
-        client.close();process.terminate();process.wait(timeout=5)
-
-
-def test_demo_sessions_preserve_prior_state_history_and_live_fixture(namespaced_portal,tmp_path,monkeypatch):
-    require_browser()
-    base,client=namespaced_portal
-    monkeypatch.setattr(config,"DEMO_ORIGIN",base);monkeypatch.setattr(config,"DATA",tmp_path)
-    monkeypatch.setenv("DEMO_ADMIN_TOKEN","release-test-token")
-    service=Service(DB("sqlite:///"+str(tmp_path/"demos.db")),Embedder("lexical"),Fetcher(base))
-    demos=DemoService(service)
-    first=demos.create("First presentation")
-    baseline=demos.action(first["id"],"baseline")
-    assert service.run(baseline["runs"][0]["id"])["metrics"]["created"]==3
-    changed=demos.action(first["id"],"modify-honours")
-    assert service.run(changed["runs"][0]["id"])["metrics"]["modified"]==1
-    versions_before=len(service.db.all(select(versions)))
-    second=demos.create("Fresh presentation")
-    assert first["static_source_id"]!=second["static_source_id"]
-    assert first["browser_source_id"]!=second["browser_source_id"]
-    assert demos.get(first["id"])["state"]["deadline"].startswith("28 August")
-    assert demos.get(second["id"])["state"]["deadline"].startswith("20 August")
-    assert len(service.db.all(select(versions)))==versions_before
-    source=service.source(second["browser_source_id"])
-    shell_before=client.get(source["root_url"]).content
-    run=service.run(service.enqueue(source["id"])["id"])
-    assert run["status"]=="succeeded" and run["metrics"]["created"]==2,run
-    update=demos.action(second["id"],"modify-live")
-    assert client.get(source["root_url"]).content==shell_before
-    assert service.run(update["runs"][0]["id"])["metrics"]["modified"]==1
-    results=service.search("innovation lab applications deadline",source_ids=[source["id"]])["results"]
-    assert any("25 November" in row["text"] for row in results)
-    assert demos.get(first["id"])["state"]["live"]==1
-    assert client.post("/demo/"+first["id"]+"/admin/reset").status_code==401
-    assert len(demos.sessions()["sessions"])==2
-    service.db.engine.dispose()
+        with pytest.raises(ValueError,match='Unknown source configuration'):
+            service.add_source('Rejected sample bypass','https://example.org/',{'demo':True})
+    finally:service.db.engine.dispose()

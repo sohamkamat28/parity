@@ -34,13 +34,13 @@ def postgres_search(service,query,qvec,model,source_ids,limit,mode,as_of,include
         projection.c.version_id,versions.c.number,versions.c.title,versions.c.observed_at,versions.c.indexed_at,
         projection.c.page_id,pages.c.url,pages.c.availability,pages.c.health,pages.c.verified_at,pages.c.checked_at,
         pages.c.last_error,projection.c.source_id,sources.c.name.label('source_name'),sources.c.config,
-        projection.c.vector).select_from(base).where(sources.c.enabled.is_(True),pages.c.health!='blocked',
+        projection.c.vector).select_from(base).where(or_(sources.c.enabled.is_(True),and_(sources.c.removed_at.is_not(None),mode=='as_of')),pages.c.health!='blocked',
             versions.c.indexed_at.is_not(None),projection.c.model_signature==model.signature)
     if source_ids is not None:stmt=stmt.where(sources.c.id.in_(source_ids))
     else:stmt=stmt.where(sources.c.config['demo'].as_boolean().is_not(True),
                          func.coalesce(sources.c.config['source_kind'].as_string(),'normal')=='normal')
     if mode=='current':
-        stmt=stmt.where(versions.c.id==pages.c.current_id)
+        stmt=stmt.where(sources.c.removed_at.is_(None),versions.c.id==pages.c.current_id)
         if not include_unavailable:stmt=stmt.where(pages.c.availability=='active')
     else:
         stmt=stmt.where(select(intervals.c.id).where(intervals.c.version_id==versions.c.id,
@@ -50,23 +50,35 @@ def postgres_search(service,query,qvec,model,source_ids,limit,mode,as_of,include
     distance=projection.c.vector.cosine_distance(qvec)
     # Adding zero forces an exact sort over eligible rows; HNSW cannot trim this set.
     ids=stmt.with_only_columns(projection.c.chunk_id,maintain_column_froms=True)
-    dense=ids.order_by(distance if approximate else distance+0.0).limit(100).cte('dense')
-    lexq=func.plainto_tsquery(literal_column("'simple'::regconfig"),query)
+    if approximate:
+        pool=select(projection.c.chunk_id).where(projection.c.model_signature==model.signature).order_by(distance).limit(max(200,limit*20)).cte('ann_pool').prefix_with('MATERIALIZED')
+        eligible_ann=ids.where(projection.c.chunk_id.in_(select(pool.c.chunk_id))).order_by(distance).limit(100).cte('eligible_ann').prefix_with('MATERIALIZED')
+        # A history-heavy projection can exhaust the ANN pool. Recover with exact
+        # eligible retrieval rather than returning an empty or outdated answer.
+        fallback=ids.where(select(func.count()).select_from(eligible_ann).scalar_subquery()<limit).order_by(distance+0.0).limit(100).cte('dense_fallback')
+        dense=union(select(eligible_ann.c.chunk_id),select(fallback.c.chunk_id)).cte('dense')
+    else:dense=ids.order_by(distance+0.0).limit(100).cte('dense')
+    query_terms=' '.join(word for word in tokens(query) if word not in STOPWORDS) or query
+    lexq=func.plainto_tsquery(literal_column("'simple'::regconfig"),query_terms)
     lexdoc=func.to_tsvector(literal_column("'simple'::regconfig"),projection.c.text)
-    lexical=ids.where(lexdoc.op('@@')(lexq)).order_by(func.ts_rank_cd(lexdoc,lexq).desc()).limit(100).cte('lexical')
+    title_doc=func.to_tsvector(literal_column("'simple'::regconfig"),func.coalesce(versions.c.title,'')+' '+func.coalesce(projection.c.heading,''))
+    fts_score=func.ts_rank_cd(lexdoc,lexq)+func.ts_rank_cd(title_doc,lexq)
+    lexical=ids.where(or_(lexdoc.op('@@')(lexq),title_doc.op('@@')(lexq))).order_by(fts_score.desc(),projection.c.chunk_id).limit(100).cte('lexical')
     selected=union(select(dense.c.chunk_id),select(lexical.c.chunk_id))
     with service.db.engine.connect() as c:
         if approximate:
             c.exec_driver_sql("SET LOCAL hnsw.ef_search = 160")
             c.exec_driver_sql("SET LOCAL hnsw.iterative_scan = 'strict_order'")
-        rows=[dict(r) for r in c.execute(stmt.where(projection.c.chunk_id.in_(selected))).mappings()]
+        ranked_stmt=stmt.add_columns(projection.c.chunk_id.in_(select(dense.c.chunk_id)).label('_dense'),
+            projection.c.chunk_id.in_(select(lexical.c.chunk_id)).label('_lexical'),fts_score.label('_fts_score'))
+        rows=[dict(r) for r in c.execute(ranked_stmt.where(projection.c.chunk_id.in_(selected))).mappings()]
     qt=set(tokens(query))-STOPWORDS
     for row in rows:
         row['_sim']=cosine(qvec,row['vector'])
         row['_lex']=len(qt.intersection(tokens((row['title'] or '')+' '+row['text'])))
         row['_score']=0
-    dense_rows=sorted(rows,key=lambda r:(-r['_sim'],r['chunk_id']))
-    lexical_rows=sorted([r for r in rows if r['_lex']],key=lambda r:(-r['_lex'],r['chunk_id']))
+    dense_rows=sorted([r for r in rows if r['_dense']],key=lambda r:(-r['_sim'],r['chunk_id']))
+    lexical_rows=sorted([r for r in rows if r['_lexical']],key=lambda r:(-r['_fts_score'],r['chunk_id']))
     for ranked in (dense_rows if model.mode=='minilm' else [],lexical_rows):
         for rank,row in enumerate(ranked,1):row['_score']+=1/(60+rank)
     results=[]
@@ -106,13 +118,13 @@ def search(service,query,source_ids=None,limit=5,mode="current",as_of=None,inclu
         versions.c.indexed_at,pages.c.id.label("page_id"),pages.c.url,pages.c.availability,pages.c.health,
         pages.c.verified_at,pages.c.checked_at,pages.c.last_error,sources.c.id.label("source_id"),
         sources.c.name.label("source_name"),sources.c.config,cache.c.vector).select_from(base).where(
-            sources.c.enabled.is_(True),cache.c.signature==model.signature,pages.c.health!="blocked")
+            or_(sources.c.enabled.is_(True),and_(sources.c.removed_at.is_not(None),mode=='as_of')),cache.c.signature==model.signature,pages.c.health!="blocked")
     if source_ids is not None:stmt=stmt.where(sources.c.id.in_(source_ids))
     else:stmt=stmt.where(sources.c.config['demo'].as_boolean().is_not(True),
                          func.coalesce(sources.c.config['source_kind'].as_string(),'normal')=='normal')
     stmt=stmt.where(versions.c.indexed_at.is_not(None))
     if mode=="current":
-        stmt=stmt.where(versions.c.id==pages.c.current_id)
+        stmt=stmt.where(sources.c.removed_at.is_(None),versions.c.id==pages.c.current_id)
         if not include_unavailable:stmt=stmt.where(pages.c.availability=="active")
     else:
         stmt=stmt.join(intervals,and_(intervals.c.version_id==versions.c.id,intervals.c.page_id==pages.c.id))
@@ -163,5 +175,6 @@ def search(service,query,source_ids=None,limit=5,mode="current",as_of=None,inclu
             score_type="RRF" if model.mode=="minilm" else "lexical_rank",last_verified_at=verified,
             freshness_status="historical" if mode=="as_of" else ("source_unavailable" if row["health"]!="healthy" else ("stale" if stale else "within_interval")),
             is_demo=row["config"].get("demo",False),warnings=warnings)
+    pending=pending_count(service,source_ids)
     return {"query":query,"mode":mode,"as_of":as_of,"embedding_mode":model.mode,"results":results,
-            "index_pending":pending_count(service,source_ids),"message":"" if results else "No sufficiently relevant evidence found. This does not prove the source has no update."}
+            "index_pending":pending,"message":"Search index updating" if pending else ("" if results else "No sufficiently relevant evidence found. This does not prove the source has no update.")}

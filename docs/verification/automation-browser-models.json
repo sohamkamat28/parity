@@ -1,0 +1,21 @@
+{
+  "models": "enabled",
+  "checks": [
+    "Two independently monitored synthetic supplier sources with stopped AI and embedding services",
+    "Natural-language threshold compiles, evaluates without models, creates a durable alert and acknowledges it through the browser",
+    "Calculation evidence lists exact inputs and opens immutable captures; Escape closes only the foremost evidence dialog",
+    "Ambiguous instructions request clarification without activation; visual field picker, supplied inputs and output dependencies create a cross-source calculation including zero",
+    "Editing a supplied parameter creates a validated immutable formula revision and reevaluates its result",
+    "Calculated zero graphs, real timestamps, keyboard graph evidence and accessible observation tables",
+    "Source failure blocks fresh calculation, retains marked stale result and open observation table; recovery and prior immutable evidence remain valid",
+    "Polling fallback updates calculated results when SSE is unavailable",
+    "390px layout without horizontal overflow, keyboard navigation, composer focus and reduced motion",
+    "Native free Qwen chat answers from server-calculated values and resolves calculation and source-capture citations"
+  ],
+  "screenshots": [
+    "outputs/runtime/automation-browser-11c6bdd26e884ea5997db445773b0220/desktop-calculations.png",
+    "outputs/runtime/automation-browser-11c6bdd26e884ea5997db445773b0220/narrow-calculations.png"
+  ],
+  "console_errors": [],
+  "status": "passed"
+}

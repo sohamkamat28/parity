@@ -5,7 +5,9 @@ from urllib.robotparser import RobotFileParser
 from . import config
 
 class FetchError(ValueError):
-    pass
+    def __init__(self,message,*,code='network_error',transient=True,response=None):
+        super().__init__(message)
+        self.code=code;self.transient=transient;self.response=response
 
 def canonical(url):
     p = urlsplit(url)
@@ -67,8 +69,8 @@ class Response:
 
 class Fetcher:
     """Connects directly to a validated address; TLS checks the original hostname."""
-    def __init__(self, demo_origin=None):
-        self.demo_origin = demo_origin or config.DEMO_ORIGIN
+    def __init__(self, fixture_origin=None):
+        self.fixture_origin = fixture_origin
         self.last_request={}
         self.robots={}
         self.robots_checked={}
@@ -78,35 +80,59 @@ class Fetcher:
         if origin(u) not in {origin(source["root_url"]),*source["config"].get("resource_origins",[])}:
             raise FetchError("Cross-origin request blocked")
         p=urlsplit(u)
-        demo=source["config"].get("demo",False) and origin(u)==self.demo_origin
-        if source["config"].get("demo") and origin(source["root_url"])!=self.demo_origin:
-            raise FetchError("Invalid demo origin")
-        addresses=list(dict.fromkeys(x[4][0] for x in socket.getaddrinfo(
-            p.hostname,p.port or (443 if p.scheme=="https" else 80),type=socket.SOCK_STREAM)))
+        fixture=self.fixture_origin is not None and origin(u)==self.fixture_origin
+        try:
+            addresses=list(dict.fromkeys(x[4][0] for x in socket.getaddrinfo(
+                p.hostname,p.port or (443 if p.scheme=="https" else 80),type=socket.SOCK_STREAM)))
+        except socket.gaierror as error:
+            raise FetchError("The website hostname could not be resolved. Check the URL and this device's network connection.",code='dns_error') from error
         if not addresses: raise FetchError("DNS returned no addresses")
         for addr in addresses:
             ip=ipaddress.ip_address(addr)
             if ip.version==6 and ip.ipv4_mapped: ip=ip.ipv4_mapped
-            if demo and not ip.is_loopback:
-                raise FetchError("Demo destination must resolve only to loopback")
-            if not demo and not ip.is_global:
-                raise FetchError("Non-public destination blocked")
+            if fixture and not ip.is_loopback:
+                raise FetchError("Test fixture destination must resolve only to loopback")
+            if not fixture and not ip.is_global:
+                raise FetchError('Non-public destination blocked',code='unsafe_destination',transient=False)
         return addresses
 
     def _request(self,url,source,headers):
         p=urlsplit(url)
         addresses=self.addresses(url,source)
+        # Alternate address families so several failing AAAA records cannot hide a working A record.
+        families={4:[],6:[]}
+        for address in addresses:families[ipaddress.ip_address(address).version].append(address)
+        first=ipaddress.ip_address(addresses[0]).version
+        addresses=[families[version][i] for i in range(4) for version in (first,6 if first==4 else 4) if i<len(families[version])][:4]
         port=p.port or (443 if p.scheme=="https" else 80)
         spacing=source["config"].get("delay",1.0)
         elapsed=time.monotonic()-self.last_request.get(p.netloc,0)
         if elapsed<spacing: time.sleep(spacing-elapsed)
         self.last_request[p.netloc]=time.monotonic()
         connection=None
+        sock=None
         try:
             # No second DNS lookup: the validated numeric address is the socket target.
-            sock=socket.create_connection((addresses[0],port),timeout=10)
-            if p.scheme=="https":
-                sock=ssl.create_default_context().wrap_socket(sock,server_hostname=p.hostname)
+            deadline=time.monotonic()+10
+            last_error=None
+            for address in addresses[:4]:
+                remaining=deadline-time.monotonic()
+                if remaining<=0:break
+                try:
+                    sock=socket.create_connection((address,port),timeout=min(3,remaining))
+                    if p.scheme=="https":
+                        sock.settimeout(min(3,max(.1,deadline-time.monotonic())))
+                        sock=ssl.create_default_context().wrap_socket(sock,server_hostname=p.hostname)
+                    break
+                except ssl.SSLCertVerificationError as error:
+                    if sock:sock.close()
+                    raise FetchError('The website TLS certificate could not be verified.',code='tls_error',transient=False) from error
+                except OSError as error:
+                    last_error=error
+                    if sock:sock.close()
+                    sock=None
+            if sock is None:raise last_error or TimeoutError('Connection budget exceeded')
+            sock.settimeout(10)
             connection=http.client.HTTPConnection(p.hostname,port,timeout=10)
             connection.sock=sock
             request_headers={"Host":p.netloc,"User-Agent":"Parity/0.1 (+source-monitor)",
@@ -121,14 +147,19 @@ class Fetcher:
             body=r.read(size+1)
             if len(body)>size: raise FetchError("Response exceeds byte limit")
             return Response(url,r.status,rh,body)
+        except TimeoutError as e:
+            target='the website\'s robots.txt rules' if p.path=='/robots.txt' else 'the website'
+            raise FetchError(f'The request to {target} timed out. Check that this URL opens on this device and network, then retry. '
+                             'The site may be unavailable or restrict automated access; reinstalling AI models will not resolve a network timeout.') from e
         except (OSError,http.client.HTTPException) as e:
             raise FetchError(type(e).__name__ + ": " + str(e)) from e
         finally:
             if connection: connection.close()
+            elif sock: sock.close()
 
     def _robots_for(self,url,source):
         key=origin(url)
-        if source["config"].get("demo") and key==self.demo_origin:return None
+        if self.fixture_origin is not None and key==self.fixture_origin:return None
         if key not in self.robots or time.monotonic()-self.robots_checked.get(key,0)>=3600:
             current=key+"/robots.txt"
             for hop in range(4):
@@ -143,7 +174,9 @@ class Fetcher:
                 rp=RobotFileParser()
                 rp.parse(rr.body.decode("utf-8",errors="replace").splitlines())
                 self.robots[key]=rp
-            else:raise FetchError("Robots rules unavailable; retry later")
+            else:raise FetchError('Robots rules unavailable (HTTP '+str(rr.status)+').',
+                code='access_blocked' if rr.status in (401,403) else 'robots_unavailable',
+                transient=rr.status in (429,500,502,503,504),response=rr)
             self.robots_checked[key]=time.monotonic()
         return self.robots[key]
 
@@ -154,7 +187,7 @@ class Fetcher:
         current=url
         for hop in range(4):
             rp=self._robots_for(current,source) if robots else None
-            if rp and not rp.can_fetch("Parity",current):raise FetchError("ROBOTS_BLOCKED")
+            if rp and not rp.can_fetch("Parity",current):raise FetchError('ROBOTS_BLOCKED: The website does not allow this page to be monitored.',code='access_blocked',transient=False)
             r=self._request(current,source,headers or {})
             if r.status not in (301,302,303,307,308): return r
             if hop==3: raise FetchError("Redirect limit exceeded")

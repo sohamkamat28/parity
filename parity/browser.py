@@ -14,6 +14,23 @@ MAX_RESOURCES = 60
 MAX_CAPTURE_BYTES = 25 * 1024 * 1024
 
 
+def preview_capture(service, url, source):
+    """Interactive previews share the same Chromium reservation as capture workers."""
+    import time
+    from sqlalchemy import select
+    from .jobs import Jobs
+    from .db import uid
+    from .job_schema import resource_locks
+    owner='preview-'+uid()
+    with service.db.tx() as connection:
+        if not Jobs(service)._reserve(connection,resource_locks,'name','chromium',owner,time.time()):
+            raise ValueError('Chromium is capturing another page. Wait for that check to finish, then refresh the preview.')
+    try:return capture(url,source,getattr(service.fetcher,"fixture_origin",None))
+    finally:
+        with service.db.tx() as connection:
+            connection.execute(resource_locks.update().where(resource_locks.c.name=='chromium',resource_locks.c.owner==owner).values(owner=None,lease_until=0))
+
+
 def browser_status():
     """Inspect Playwright's pinned browser installation without starting a browser."""
     try:
@@ -34,6 +51,8 @@ def browser_status():
         candidates=[folder/"chrome-win64"/"chrome.exe",folder/"chrome-win"/"chrome.exe",
                     folder/"chrome-linux64"/"chrome",folder/"chrome-linux"/"chrome",
                     folder/"chrome-mac"/"Chromium.app"/"Contents"/"MacOS"/"Chromium"]
+        candidates += [folder/"chrome-mac-arm64"/"Google Chrome for Testing.app"/"Contents"/"MacOS"/"Google Chrome for Testing",
+                       folder/"chrome-mac-x64"/"Google Chrome for Testing.app"/"Contents"/"MacOS"/"Google Chrome for Testing"]
         executable=next((p for p in candidates if p.is_file()),None)
         if executable is None:
             raise ValueError("Matching Chromium is missing. Run python -m playwright install chromium.")
@@ -42,8 +61,10 @@ def browser_status():
         return {"status":"missing","executable":None,"error":str(error)}
 
 
-def capture(url,source,demo_origin=None):
-    payload={"url":url,"source":source,"demo_origin":demo_origin,
+def capture(url,source,fixture_origin=None):
+    readiness=browser_status()
+    if readiness['status']!='installed':raise FetchError(readiness['error'],code='rendering_unavailable',transient=False)
+    payload={"url":url,"source":source,"fixture_origin":fixture_origin,
              "seconds":CAPTURE_SECONDS,"max_resources":MAX_RESOURCES,"max_bytes":MAX_CAPTURE_BYTES}
     flags=subprocess.CREATE_NO_WINDOW if sys.platform=="win32" else 0
     proc=subprocess.Popen([sys.executable,"-m","parity.browser_worker"],
@@ -66,6 +87,6 @@ def capture(url,source,demo_origin=None):
         detail=stderr.decode("utf-8",errors="replace")[-700:]
         raise FetchError("Browser capture process failed: "+(detail or str(proc.returncode))) from error
     if proc.returncode or result.get("error"):
-        raise FetchError("Browser capture failed: "+result.get("error","worker exited unexpectedly"))
+        raise FetchError("Browser capture failed: "+result.get("error","worker exited unexpectedly"),code=result.get('code','rendering_failed'),transient=result.get('transient',True))
     response=result["response"]
     return Response(response["url"],response["status"],response["headers"],base64.b64decode(response["body"]))
