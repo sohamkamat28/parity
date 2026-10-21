@@ -39,8 +39,10 @@ function FieldOverview({field:f,onOpen}:{field:MonitorField;onOpen:()=>void}){
  return <article className={`monitor-widget overview-field ${f.status!=='ok'?'field-unverified':''}`} aria-label={`${f.name} tracked field`}>
   <button className="field-tile" aria-label={`View details for ${f.name}`} onClick={onOpen}>
    <h3 title={f.name}>{f.name.replace(' — latest dated row',' ·')}</h3>
-   {structured&&value!=null?<span className="structured-count">{summary}</span>:<MonitoredValue field={f}/>}
-   {f.status!=='ok'&&<span className="tile-warning">{state.label}</span>}
+   <div className="tile-value">
+    {structured&&value!=null?<span className="structured-count">{summary}</span>:<MonitoredValue field={f}/>}
+    {f.status!=='ok'&&<span className="tile-warning">{state.label}</span>}
+   </div>
   </button>
  </article>;
 }
