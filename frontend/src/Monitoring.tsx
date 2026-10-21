@@ -56,14 +56,26 @@ function FieldDetails({field:f,onClose,openCapture,onHistory}:{field:MonitorFiel
   <div className="widget-footer"><button disabled={!f.capture_id} onClick={()=>f.capture_id&&openCapture(f.capture_id,f)}><ShieldCheck size={14}/>View evidence</button><button disabled={!f.monitor_id} onClick={onHistory}><History size={14}/>View history<ChevronRight size={13}/></button></div>
  </div></Modal>;
 }
-function nextCheck(at:number){
+function nextCheck(at:number,now=Date.now()/1000){
  if(!Number.isFinite(at))return 'Not scheduled';
- const seconds=at-Date.now()/1000;if(seconds<=0)return 'Due now';
+ const seconds=at-now;if(seconds<=0)return 'Due now';
  return seconds<60?'In less than a minute':seconds<3600?`In ${Math.ceil(seconds/60)} min`:`In ${Math.ceil(seconds/3600)} hr`;
 }
 function frequency(seconds:number){
  for(const [unit,size] of [['day',86400],['hour',3600],['minute',60],['second',1]] as const)if(seconds>=size&&seconds%size===0){const count=seconds/size;return `Every ${count} ${unit}${count===1?'':'s'}`;}
  return `Every ${seconds} seconds`;
+}
+function SourceCheckStatus({monitors,interval}:{monitors:Monitor[];interval:number}){
+ const [now,setNow]=useState(()=>Date.now()/1000);
+ useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()/1000),15000);return()=>clearInterval(timer);},[]);
+ const lastChecked=Math.max(0,...monitors.map(m=>m.last_checked_at??0));
+ const paused=monitors.every(m=>m.paused);
+ const next=Math.min(...monitors.filter(m=>!m.paused&&m.next_check_at).map(m=>m.next_check_at!));
+ return <dl className="source-check-status" aria-label="Check schedule">
+  <div><dt className="sr-only">Check frequency</dt><dd>{frequency(interval)}</dd></div>
+  <div><dt>Last checked</dt><dd>{lastChecked?<time dateTime={new Date(lastChecked*1000).toISOString()} title={date(lastChecked)}>{relative(lastChecked)}</time>:'Not yet checked'}</dd></div>
+  <div><dt>Next check</dt><dd>{paused?'Paused':Number.isFinite(next)?<time dateTime={new Date(next*1000).toISOString()} title={date(next)}>{nextCheck(next,now)}</time>:'Not scheduled'}</dd></div>
+ </dl>;
 }
 const EMPTY_DASHBOARD:DashboardData={sources:[],monitors:[],widgets:[],totals:{},attention:[]};
 export function Dashboard(shared:Shared){
@@ -111,7 +123,7 @@ export function Dashboard(shared:Shared){
     const {id,source:website,monitors,fields,attention}=group,calculations=automations.items.filter(a=>a.source_ids.length===1&&a.source_ids[0]===id);
     const paused=monitors.every(m=>m.paused);
     return <section className="source-overview panel" aria-label={`${group.name} source overview`} key={id}>
-     <header className="source-overview-heading"><div className="source-overview-title"><button className="source-name-button" title="Source details and monitoring controls" onClick={()=>setSelectedSource(id)}><h2>{group.name}</h2></button>{website?.root_url&&<External url={website.root_url}>{website.root_url.replace(/^https?:\/\//,'').replace(/\/$/,'')}</External>}</div>{paused&&<Badge>Paused</Badge>}{attention.length>0&&<button className="source-attention-link" onClick={()=>setSelectedSource(id)}><TriangleAlert size={14}/><span>Needs attention</span></button>}<IconButton className="source-refresh" label="Check now" disabled={busy===id||paused} onClick={()=>void check(id)}>{busy===id?<Spinner/>:<RefreshCw size={18}/>}</IconButton></header>
+     <header className="source-overview-heading"><div className="source-overview-title"><button className="source-name-button" title="Source details and monitoring controls" onClick={()=>setSelectedSource(id)}><h2>{group.name}</h2></button>{website?.root_url&&<External url={website.root_url}>{website.root_url.replace(/^https?:\/\//,'').replace(/\/$/,'')}</External>}</div>{paused&&<Badge>Paused</Badge>}{attention.length>0&&<button className="source-attention-link" onClick={()=>setSelectedSource(id)}><TriangleAlert size={14}/><span>Needs attention</span></button>}<div className="source-check-actions"><SourceCheckStatus monitors={monitors} interval={Number(website?.config.interval??900)}/><IconButton className="source-refresh" label="Check now" disabled={busy===id||paused} onClick={()=>void check(id)}>{busy===id?<Spinner/>:<RefreshCw size={18}/>}</IconButton></div></header>
      <div className={`source-overview-body ${calculations.length?'with-calculations':''}`}>
       <section className="source-field-section" aria-label={`${group.name} tracked information`}><h3 className="source-calculation-title">Tracked information</h3><div className="source-fields">{fields.map(f=><FieldOverview key={`${f.monitor_id}:${f.id}`} field={f} onOpen={()=>setSelectedField(f)}/>)}</div></section>
       {calculations.length>0&&<section className="source-calculations" aria-label={`${group.name} calculations`}><h3 className="source-calculation-title">Calculations</h3><AutomationCards items={calculations} shared={shared} onEvidence={setCalculation} onEdit={setComposer}/></section>}
