@@ -1,5 +1,14 @@
 # Parity 2.0 verification report
 
+## Dashboard metric strips — 21 October 2026
+
+The latest dashboard replaces ledger rows with connected metric strips matching the supplied reference: muted labels above larger values, small units, shared outer surfaces and vertical dividers. Source grouping, controls, search, history and evidence remain intact. The Agno-inspired light theme is unchanged elsewhere.
+
+Production TypeScript/Vite build and both isolated PostgreSQL browser suites passed with models stopped. New assertions verify that baselines have no percentage, the fixture price change from 1200.5 INR to 1250 INR shows the server-provided 4.12%, failed attempts suppress the badge while preserving the value, and recovery restores it. Existing suites cover zero/table/list values, automatic setup, persisted scheduling, SSE/polling, source removal/restoration, calculation revisions, alerts, keyboard use and exact 390px layouts. Both report zero browser errors and no series requests.
+
+Manual desktop/narrow review found no metric or page overflow; units fit beside their values and keyboard evidence navigation passed. [Review measurements](verification/dashboard-metric-strips.json) distinguish CUA's zoom-adjusted viewport from the exact automated viewport. No database migration, Python service behavior, new frontend dependency or local data change is involved.
+
+
 ## Application theme refresh — 21 October 2026
 
 - Production TypeScript/Vite build: passed, with bundled fonts and no added dependency.

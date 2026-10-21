@@ -6,6 +6,7 @@ import {api,date,patch,post,relative} from './api';
 import {Badge,Empty,ErrorBox,External,IconButton,Modal,SectionTitle,Skeleton,Spinner,Status} from './ui';
 import {MonitorWizard} from './MonitorWizard';
 import {AutomationCards,AutomationAlerts,AutomationDeliveries,AutomationComposer,CalculationEvidence,useAutomations} from './Automations';
+import {MetricChange,MetricStrip,MetricValue} from './DashboardMetrics';
 import './dashboard.css';
 
 function checkError(message:string){return /nodename nor servname|Name or service not known|getaddrinfo failed/.test(message)?'Website DNS lookup failed. Check the URL and this device’s network connection.':message;}
@@ -39,7 +40,9 @@ function FieldOverview({field:f,onOpen}:{field:MonitorField;onOpen:()=>void}){
  return <article className={`monitor-widget overview-field ${f.status!=='ok'?'field-unverified':''}`} aria-label={`${f.name} tracked field`}>
   <button className="field-tile" aria-label={`View details for ${f.name}`} onClick={onOpen}>
    <h3 title={f.name}>{f.name.replace(' — latest dated row',' ·')}</h3>
-   {structured&&value!=null?<span className="structured-count">{summary}</span>:<MonitoredValue field={f}/>}
+   {structured&&value!=null?<span className="structured-count">{summary}</span>:value!=null&&f.type!=='text'?<MetricValue text={displayValue(value)} unit={f.unit??f.preview?.unit} className="observed-value"/>:<MonitoredValue field={f}/>}
+   <MetricChange field={f}/>
+   {f.period&&<span className="metric-period">{f.period}</span>}
    {f.status!=='ok'&&<span className="tile-warning">{state.label}</span>}
   </button>
  </article>;
@@ -125,7 +128,7 @@ export function Dashboard(shared:Shared){
     return <section className="source-overview panel" aria-label={`${group.name} source overview`} key={id}>
      <header className="source-overview-heading"><div className="source-overview-title"><button className="source-name-button" title="Source details and monitoring controls" onClick={()=>setSelectedSource(id)}><h2>{group.name}</h2></button>{website?.root_url&&<External url={website.root_url}>{website.root_url.replace(/^https?:\/\//,'').replace(/\/$/,'')}</External>}</div>{paused&&<Badge>Paused</Badge>}{attention.length>0&&<button className="source-attention-link" onClick={()=>setSelectedSource(id)}><TriangleAlert size={14}/><span>Needs attention</span></button>}<div className="source-check-actions"><SourceCheckStatus monitors={monitors} interval={Number(website?.config.interval??900)}/><IconButton className="source-refresh" label="Check now" disabled={busy===id||paused} onClick={()=>void check(id)}>{busy===id?<Spinner/>:<RefreshCw size={18}/>}</IconButton></div></header>
      <div className={`source-overview-body ${calculations.length?'with-calculations':''}`}>
-      <section className="source-field-section" aria-label={`${group.name} tracked information`}><h3 className="source-calculation-title">Tracked information</h3><div className="source-fields">{fields.map(f=><FieldOverview key={`${f.monitor_id}:${f.id}`} field={f} onOpen={()=>setSelectedField(f)}/>)}</div></section>
+      <section className="source-field-section" aria-label={`${group.name} tracked information`}><h3 className="source-calculation-title">Tracked information</h3><MetricStrip className="source-fields">{fields.map(f=><FieldOverview key={`${f.monitor_id}:${f.id}`} field={f} onOpen={()=>setSelectedField(f)}/>)}</MetricStrip></section>
       {calculations.length>0&&<section className="source-calculations" aria-label={`${group.name} calculations`}><h3 className="source-calculation-title">Calculations</h3><AutomationCards items={calculations} shared={shared} onEvidence={setCalculation} onEdit={setComposer}/></section>}
      </div>
     </section>;

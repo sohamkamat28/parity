@@ -17,10 +17,10 @@
     "Remove/restore UI retains immutable evidence, hides active source and restores with monitoring paused"
   ],
   "screenshots": [
-    "outputs/runtime/browser-1e1b9ad39f2544119068b2da813a5bb5/desktop.png",
-    "outputs/runtime/browser-1e1b9ad39f2544119068b2da813a5bb5/narrow.png",
-    "outputs/runtime/browser-1e1b9ad39f2544119068b2da813a5bb5/source-grouped.png",
-    "outputs/runtime/browser-1e1b9ad39f2544119068b2da813a5bb5/source-grouped-narrow.png"
+    "outputs/runtime/browser-0e477a262ecd445fadca3a7fbff565c5/desktop.png",
+    "outputs/runtime/browser-0e477a262ecd445fadca3a7fbff565c5/narrow.png",
+    "outputs/runtime/browser-0e477a262ecd445fadca3a7fbff565c5/source-grouped.png",
+    "outputs/runtime/browser-0e477a262ecd445fadca3a7fbff565c5/source-grouped-narrow.png"
   ],
   "console_errors": [],
   "series_requests": 0,

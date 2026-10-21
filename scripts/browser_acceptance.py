@@ -91,6 +91,7 @@ def main():
                     page.locator('.nav-item').filter(has_text='Dashboard').click()
                     price=page.locator('.monitor-widget').filter(has=page.get_by_role('heading',name='Current Price',exact=True))
                     expect(price.locator('.observed-value')).to_have_text('1200.5 INR',timeout=25000)
+                    expect(price.locator('.metric-change')).to_have_count(0)
                     expect(page.locator('.monitor-widget').filter(has=page.get_by_role('heading',name='Promoter holding',exact=True)).locator('.observed-value')).to_have_text('0 %')
                     # Existing captures and a stopped semantic service must not prevent values.
                     dashboard=client.get('/api/dashboard').json()
@@ -122,6 +123,7 @@ def main():
                     page.evaluate("id=>{window.acceptanceEvents=0;window.acceptanceStream=new EventSource('/api/events?after='+id);window.acceptanceStream.addEventListener('update',()=>window.acceptanceEvents++);}",dashboard['event_id'])
                     httpx.post(portal+'/admin/modify-honours',headers={'X-Fixture-Token':env['PARITY_FIXTURE_TOKEN']},trust_env=False).raise_for_status()
                     expect(price.locator('.observed-value')).to_have_text('1250 INR',timeout=30000)
+                    expect(price.locator('.metric-change')).to_have_text('4.12%')
                     expect(page.locator('.cell-changed')).to_have_count(1)
                     expect(page.get_by_role('dialog').get_by_role('table')).to_be_visible()
                     page.wait_for_function('window.acceptanceEvents > 0',timeout=15000)
@@ -143,8 +145,10 @@ def main():
                     httpx.post(portal+'/admin/fault',headers={'X-Fixture-Token':env['PARITY_FIXTURE_TOKEN']},json={'target':'metrics','status':403},trust_env=False).raise_for_status()
                     expect(page.locator('.source-attention-link')).to_be_visible(timeout=30000)
                     expect(price.locator('.observed-value')).to_have_text('1250 INR',)
+                    expect(price.locator('.metric-change')).to_have_count(0)
                     httpx.post(portal+'/admin/clear-faults',headers={'X-Fixture-Token':env['PARITY_FIXTURE_TOKEN']},trust_env=False).raise_for_status()
                     expect(page.locator('.source-attention-link')).not_to_be_visible(timeout=30000)
+                    expect(price.locator('.metric-change')).to_have_text('4.12%')
                     passed('Failed HTTP check retains previous verified value and warning; next successful check recovers')
                     page.screenshot(path=str(output/'desktop.png'),full_page=True);report['screenshots'].append(str((output/'desktop.png').relative_to(ROOT)))
                     # Disable streaming to exercise the actual polling path.

@@ -2,6 +2,12 @@
 
 Updated 21 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
 
+## Dashboard metric strips — 21 October 2026
+
+The dashboard now follows the latest reference: source-grouped connected metric strips, muted labels above prominent values, smaller unit labels and vertical dividers. Calculations follow the extracted metrics in the same visual style. Narrow screens use two columns within each shared strip. Individual bento cards and the earlier ledger layout are superseded. Existing source controls, immutable evidence/history, search and updates are retained.
+
+Change badges use the backend's comparable observation pair; no prior value means no percentage, stale results suppress badges, percentage-point differences stay distinct, and previous-zero comparisons use absolute changes. Budget state is labeled against the supplied budget rather than presented as a historical percentage.
+
 ## Application theme refresh — 21 October 2026
 
 The application now uses an Agno-inspired light visual language: white surfaces, charcoal text, coral actions, consistent typography and restrained dividers. The dashboard uses flat source-grouped field and calculation ledgers instead of individual cards. Sources, changes/history, chat, setup, calculation, notification and evidence dialogs share the same tokens. Existing source schedules, identifiers, observations and formulas are unchanged; no schema migration or new frontend dependency is required.

@@ -11,11 +11,11 @@ The October 2026 refresh takes visual direction from [Agno](https://www.agno.com
 - Native buttons, inputs and existing modal focus management remain in use. Keyboard shortcuts still work without displaying numbers on navigation buttons.
 - Motion is limited to interaction feedback and is suppressed by reduced-motion preferences.
 
-## Dashboard ledger
+## Dashboard metric strips
 
-`dashboard.css` displays source groups with a linked source title and real check scheduling metadata. Fields are flat, full-width name/value rows. Single-source calculations appear alongside on wide screens and below on narrow screens. Cross-source results remain in their existing section. Numeric values use tabular monospaced type, and names remain larger than values.
+`dashboard.css` displays source groups with a linked source title and real check scheduling metadata. `DashboardMetrics.tsx` balances metrics into connected white strips with up to five columns, shared outer edges and vertical separators. Muted labels sit above prominent tabular values; units remain smaller. Fields appear first and single-source calculations follow in their own strip. Narrow screens use two columns within the shared strip. Cross-source results remain in their existing section.
 
-Each row is a keyboard-operable button opening the existing details and immutable evidence. Failed/stale field warnings remain visible. Budget results retain contextual emphasis. No field card grid, trend chart, range selector or arrangement interface is rendered.
+Each metric is a keyboard-operable button opening the existing details and immutable evidence. Failed/stale field warnings remain visible. Only server-provided comparable observation pairs produce change badges. Percentage fields show percentage-point differences, and previous-zero comparisons retain absolute differences. Baseline and stale inputs do not show comparison percentages. Direction alone is neutral; explicit budget conditions use verified/warning colors and are labeled against the supplied budget. No individual metric cards, trend chart, range selector or arrangement interface is rendered.
 
 The refresh changes presentation only: observations, extraction rules, schedules, calculation formulas, historical evidence and retrieval contracts are not migrated or rewritten.
 

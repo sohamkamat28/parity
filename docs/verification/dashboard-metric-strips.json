@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-21",
+  "layout": "Source-grouped connected metric strips with up to five columns, prominent values, smaller unit labels and vertical separators",
+  "monitoring_browser": "browser-no-models.json",
+  "automation_browser": "automation-browser.json",
+  "build": "passed",
+  "comparison_checks": [
+    "Baseline does not show a percentage",
+    "1200.5 INR to 1250 INR shows the server-produced 4.12% comparison",
+    "Failed HTTP attempt hides the comparison while preserving 1250 INR",
+    "Recovery restores the comparable percentage"
+  ],
+  "manual_review": {
+    "desktop": {
+      "requested_width": 1440,
+      "observed_css_width": 1600,
+      "document_width": 1593,
+      "overflow": false
+    },
+    "narrow": {
+      "requested_width": 390,
+      "observed_css_width": 433,
+      "document_width": 426,
+      "metric_overflow_count": 0,
+      "columns": 2
+    },
+    "keyboard": [
+      "Field details opens from metric",
+      "Calculation evidence opens from metric"
+    ],
+    "note": "CUA viewport measurements reflect existing browser zoom; isolated automated tests also exercise exact 390 CSS pixels."
+  },
+  "data_changes": "None; no extraction rules, observation records, calculation formulas or schedules were changed."
+}
