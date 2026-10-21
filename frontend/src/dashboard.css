@@ -31,15 +31,13 @@
 .dashboard-screen .source-field-section { min-width: 0; padding: 22px; }
 .dashboard-screen .source-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; border: 0; }
 .dashboard-screen .source-fields > .overview-field { display: block; min-width: 0; border: 0; border-radius: 0; background: none; }
-.field-tile, .calculation-tile { display: grid; grid-template-rows: auto 1fr; align-items: stretch; gap: 0; width: 100%; min-height: 112px; height: 100%; padding: 0; overflow: hidden; text-align: left; border: 1px solid #354653; border-radius: 10px; background: var(--tile-heading, #19252f); transition: border-color .15s, background-color .15s; }
-.field-tile:hover, .calculation-tile:hover { --tile-heading: #20323b; --tile-surface: #15262d; border-color: #6bafa1; }
+.field-tile, .calculation-tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; width: 100%; min-height: 104px; height: 100%; padding: 17px; text-align: left; border: 1px solid #35414f; border-radius: 11px; background: #151e28; transition: border-color .15s, background-color .15s; }
+.field-tile:hover, .calculation-tile:hover { border-color: #6bafa1; background: #192630; }
 .field-tile:focus-visible, .calculation-tile:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-.field-tile h3, .dashboard-screen .calculation-tile h3 { display: flex; align-items: center; min-height: 55px; padding: 15px 17px 13px; font-size: 18px; font-weight: 600; line-height: 1.4; color: #edf4fa; margin: 0; overflow-wrap: anywhere; }
-.tile-value { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 6px; min-width: 0; min-height: 55px; padding: 13px 17px 15px; border-top: 1px solid #344653; background: var(--tile-surface, #101c25); box-shadow: inset 0 1px #ffffff03; }
-.field-tile .observed-value, .dashboard-screen .calculation-value { display: block; max-width: 100%; margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 400; letter-spacing: -.3px; line-height: 1.5; font-variant-numeric: tabular-nums; text-align: right; color: #b6dfd5; overflow-wrap: anywhere; }
+.field-tile h3, .dashboard-screen .calculation-tile h3 { font-size: 18px; font-weight: 600; line-height: 1.4; color: #edf4fa; margin: 0; overflow-wrap: anywhere; }
+.field-tile .observed-value, .dashboard-screen .calculation-value { display: block; margin: 0; font-family: inherit; font-size: 16px; font-weight: 450; letter-spacing: 0; line-height: 1.5; font-variant-numeric: tabular-nums; color: #bdcbd8; overflow-wrap: anywhere; }
 .field-tile .text-value { font-size: 14px; font-weight: 400; letter-spacing: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.field-tile .text-value { align-self: stretch; font-family: inherit; text-align: left; color: #c7d4df; }
-.field-tile .structured-count { font-size: 16px; color: #b6dfd5; }
+.field-tile .structured-count { font-size: 16px; color: #bdcbd8; }
 .field-tile .muted { font-size: 12px; }
 .field-unverified .field-tile { border-color: #786140; }
 .tile-warning { font-size: 10px; line-height: 1.5; color: var(--amber); }
@@ -48,9 +46,7 @@
 .dashboard-screen .automation-list { display: grid; gap: 18px; }
 .dashboard-screen .calculation-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; padding: 0; }
 .dashboard-screen .calculation-card { display: block; min-width: 0; padding: 0; border: 0; border-radius: 0; background: none; }
-.dashboard-screen .calculation-key-result .calculation-tile { --tile-heading: #1b3029; --tile-surface: #10231d; border-color: #416658; }
-.dashboard-screen .calculation-key-result .tile-value { border-top-color: #355448; }
-.dashboard-screen .calculation-key-result .calculation-tile:hover { --tile-heading: #223e32; --tile-surface: #143025; }
+.dashboard-screen .calculation-key-result .calculation-tile { background: #162720; border-color: #385c50; }
 .dashboard-screen .calculation-key-result .calculation-value { color: #b9edda; }
 .dashboard-screen .calculation-key-result.calculation-over-budget .calculation-value, .dashboard-screen .stale-value .calculation-value { color: var(--amber); }
 .dashboard-screen .stale-value .calculation-tile { border-color: #786140; }
@@ -103,9 +99,8 @@
  .dashboard-screen .source-overview-title > .external { font-size: 11px; }
  .dashboard-screen .source-field-section, .dashboard-screen .source-calculations { padding: 16px; }
  .dashboard-screen .source-fields, .dashboard-screen .calculation-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
- .field-tile, .calculation-tile { min-height: 106px; }
- .field-tile h3, .dashboard-screen .calculation-tile h3 { min-height: 53px; padding: 13px; font-size: 17px; }
- .tile-value { min-height: 51px; padding: 12px 13px 14px; }
+ .field-tile, .calculation-tile { min-height: 100px; padding: 13px; gap: 9px; }
+ .field-tile h3, .dashboard-screen .calculation-tile h3 { font-size: 17px; }
  .field-tile .observed-value, .dashboard-screen .calculation-value, .field-tile .structured-count { font-size: 15px; }
  .dashboard-search { margin-bottom: 20px; }
  .source-attention-link > span { display: none; }
