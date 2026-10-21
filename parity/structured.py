@@ -193,7 +193,7 @@ def json_path(node,path):
 
 
 def validate_rule(rule):
-    if not isinstance(rule, dict) or rule.get('kind') not in ('scalar', 'label_value', 'table', 'table_cell', 'list', 'json_ld'):
+    if not isinstance(rule, dict) or rule.get('kind') not in ('scalar', 'label_value', 'table', 'table_cell', 'dated_table_cell', 'list', 'json_ld'):
         raise ValueError('Select a supported extraction rule.')
     if rule['kind']=='json_ld':
         if not isinstance(rule.get('entity'),str) or len(rule['entity'])>2000:raise ValueError('A stable structured-data entity is required.')
@@ -218,6 +218,10 @@ def validate_rule(rule):
     if rule.get('unit_attribute') not in (None,'content','value','aria-label'):raise ValueError('Unsupported unit attribute.')
     if rule.get('period_mode', 'fixed') not in ('fixed', 'latest'):
         raise ValueError('Choose a fixed or latest reporting period.')
+    if rule['kind']=='dated_table_cell':
+        if not isinstance(rule.get('column'),str) or not rule['column'] or len(rule['column'])>120:raise ValueError('A stable labelled column is required.')
+        if rule.get('row_date_format') not in ('%d/%m/%Y','%m/%d/%Y','%Y-%m-%d'):raise ValueError('An explicit row-date format is required.')
+        if rule.get('session','') not in ('','AM','PM'):raise ValueError('Unsupported publication session.')
 
 
 def extract_field(body, field, url):
@@ -229,6 +233,25 @@ def extract_field(body, field, url):
     if (kind == 'table') != (rule['kind'] == 'table') or (kind == 'list') != (rule['kind'] == 'list'):
         raise ValueError('Table and repeating-list fields require their matching extraction rule.')
     soup = body if isinstance(body, BeautifulSoup) else soup_for(body)
+    if rule['kind']=='dated_table_cell':
+        tables=soup.select(rule['selector'])
+        if len(tables)!=1:raise LookupError('The dated table is missing or ambiguous.')
+        rows=[]
+        for row in tables[0].find_all('tr')[:1000]:
+            cells=row.find_all(['td','th'],recursive=False)
+            if not cells or not re.fullmatch(r'\d{1,4}[-/]\d{1,2}[-/]\d{1,4}',clean(cells[0].get_text(' ',strip=True))):continue
+            try:date=datetime.strptime(clean(cells[0].get_text(' ',strip=True)),rule['row_date_format'])
+            except ValueError:raise LookupError('The reporting-date format changed. Review this field.')
+            selected=[cell for cell in cells[1:] if clean(cell.get('data-label') or cell.get('aria-label')).casefold()==rule['column'].casefold()]
+            if len(selected)!=1:raise LookupError('The labelled dated-table column is missing or ambiguous.')
+            rows.append((date,selected[0]))
+        if not rows:raise LookupError('No dated reporting rows were found.')
+        newest=max(date for date,node in rows)
+        selected=[node for date,node in rows if date==newest]
+        if len(selected)!=1:raise LookupError('The newest reporting date appears more than once.')
+        raw=clean(selected[0].get_text(' ',strip=True));value,unit=normalize(raw,kind,rule.get('unit',''))
+        period=newest.date().isoformat()+((' '+rule['session']) if rule.get('session') else '')
+        return dict(value=value,raw_text=raw,unit=unit,period=period,locator=rule['selector']+' / date: '+period+' / column: '+rule['column'],fingerprint=fingerprint(dict(type=kind,value=value,unit=unit,period=period)))
     if rule['kind']=='json_ld':
         entities=[node for identity,node in json_entities(soup) if identity==rule['entity']]
         if len(entities)!=1:raise LookupError('The saved structured-data entity is missing or ambiguous.')
@@ -352,6 +375,22 @@ def discover(body, url):
         attribute='content' if node.has_attr('content') else 'data-value' if node.has_attr('data-value') else None
         raw=clean(node.get(attribute)) if attribute else clean(node.get_text(' ',strip=True))
         if label and infer_type(raw)!='text':
+            # Responsive tables often label each cell rather than exposing usable
+            # column headers. Bind numeric values to that label and the newest
+            # explicitly parsed row date, instead of a moving nth-row selector.
+            if node.name=='td' and node.parent and node.parent.name=='tr':
+                cells=node.parent.find_all(['th','td'],recursive=False)
+                date_text=clean(cells[0].get_text(' ',strip=True)) if cells else ''
+                match=re.fullmatch(r'(\d{1,4})([-/])(\d{1,2})[-/](\d{1,4})',date_text)
+                fmt=('%Y-%m-%d' if match and len(match[1])==4 and match[2]=='-' else '%d/%m/%Y' if match and int(match[1])>12 else '%m/%d/%Y' if match and int(match[3])>12 else None)
+                table=node.find_parent('table')
+                if fmt and table:
+                    container=table.find_parent(attrs={'id':True})
+                    context=clean(container.get('aria-label') or container.get('id')) if container else ''
+                    session_match=re.search(r'(?:^|[-_\s])(am|pm)(?:$|[-_\s])',context,re.I)
+                    session=session_match[1].upper() if session_match else ''
+                    add(label+' — latest dated row'+((' '+session) if session else ''),infer_type(raw),dict(kind='dated_table_cell',selector=css_path(table),column=label,row_date_format=fmt,period_mode='latest',session=session))
+                    continue
             rule=dict(kind='scalar',selector=css_path(node),**({'attribute':attribute} if attribute else {}))
             kind=infer_type(raw)
             if prop=='price':

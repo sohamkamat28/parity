@@ -197,7 +197,8 @@ class MonitorService:
             raise ValueError('Parity could not identify the requested information in this page, including its rendered content. '
                              'Try a more specific description or a direct page containing the value. Monitoring has not been started.')
         result['fields'] = [field for field in result['fields'] if field['valid']]
-        if re.search(r'\b(?:current price|cost)\b',request['instructions'],re.I):
+        from .automation import calculation_requested
+        if re.search(r'\b(?:current price|cost)\b',request['instructions'],re.I) and not calculation_requested(request['instructions']):
             prices=[f for f in result['fields'] if f['type'] in ('number','currency') and re.search(r'price|cost',f['name'],re.I)]
             terms=set(re.findall(r'[a-z0-9]+',request['instructions'].casefold()))-{'track','the','current','price','cost','of','and','monitor'}
             if prices and terms:
@@ -214,6 +215,16 @@ class MonitorService:
                 price_ids={f['id'] for f in result['fields'] if f['type'] in ('number','currency') and re.search(r'price|cost',f['name'],re.I)}
                 result['fields']=[f for f in result['fields'] if f['id'] not in price_ids or f['id']==selected['id']]
         result['message'] = 'Extraction validated. Ready to create dashboard widgets automatically.'
+        return self.automation_preview(result,payload)
+
+    def automation_preview(self,result,payload):
+        from .automation import Automations,calculation_requested
+        if calculation_requested(payload.get('instructions','')):
+            with self.db.tx() as connection:
+                connection.execute(schema.monitor_drafts.update().where(schema.monitor_drafts.c.id==result['draft_id']).values(fields=result['fields']))
+            result['automation']=Automations(self.service).preview({'instructions':payload['instructions'],'monitor_draft_id':result['draft_id'],
+                'answers':payload.get('answers') or {},'use_ai':payload.get('use_ai',True)})
+            if result['automation']['status']!='ready':result['message']='Answer the calculation questions before monitoring starts.'
         return result
 
     def _activate(self, payload, monitor_id=None):
@@ -228,9 +239,30 @@ class MonitorService:
                 raise ValueError('This preview was already used by another monitor.')
             monitor = self.monitor(draft['activated_id'])
             return {'monitor': monitor, 'source': self.service.source(monitor['source_id']), 'run': None}
+        from .automation import Automations,calculation_requested
+        from . import automation_schema
+        automation_service=Automations(self.service)
+        automation_draft=None
+        if calculation_requested(draft['instructions']) or payload.get('automation_draft_id'):
+            automation_draft_id=payload.get('automation_draft_id')
+            if not automation_draft_id:
+                latest=self.db.one(select(automation_schema.automation_drafts).where(automation_schema.automation_drafts.c.monitor_draft_id==draft['id']).order_by(automation_schema.automation_drafts.c.created_at.desc()))
+                automation_draft_id=latest['id'] if latest else None
+            automation_draft=automation_service.checked_draft(automation_draft_id)
+            if automation_draft['monitor_draft_id']!=draft['id']:raise ValueError('The calculation belongs to a different source preview.')
         capture = self.db.one(select(schema.monitor_captures).where(schema.monitor_captures.c.id == draft['capture_id']))
         parsed=soup_for(self._body(capture))
-        fields = self._validated_fields(payload.get('fields', draft['fields']), parsed, capture['url'])
+        selected_fields=copy.deepcopy(payload.get('fields', draft['fields']))
+        if automation_draft:
+            for binding in automation_draft['plan']['inputs']:
+                if binding['monitor_id']!='draft:'+draft['id']:continue
+                selected=next((f for f in selected_fields if f['id']==binding['field_id']),None)
+                if selected:selected['enabled']=True
+                else:
+                    candidate=next((f for f in draft['candidates'] if f['id']==binding['field_id']),None)
+                    if not candidate:raise ValueError('A calculation field is missing from the saved extraction preview.')
+                    selected_fields.append(copy.deepcopy(candidate))
+        fields = self._validated_fields(selected_fields, parsed, capture['url'])
         enabled = [field for field in fields if field['enabled']]
         if not enabled:
             raise ValueError('Select at least one field to monitor.')
@@ -251,6 +283,7 @@ class MonitorService:
         monitor = {'id': monitor_id, 'source_id': source['id'], 'name': clean(payload.get('name') or source['name'])[:120], 'instructions': clean(payload.get('instructions', draft['instructions']))[:4000], 'revision_id': revision_id, 'paused': False, 'created_at': old['created_at'] if old else now, 'updated_at': now}
         revision = {'id': revision_id, 'monitor_id': monitor_id, 'number': old['revision_number']+1 if old else 1, 'fields': saved_fields, 'root_url': capture['url'], 'created_at': now}
         with self.db.tx() as connection:
+            if automation_draft:automation_service._lock_sources(connection,automation_draft['plan'])
             if draft['source_id']:
                 current=connection.execute(select(sources).where(sources.c.id==draft['source_id']).with_for_update()).mappings().first()
                 if not current or current['removed_at'] is not None:raise ValueError('Restore this source before activating monitoring.')
@@ -274,6 +307,9 @@ class MonitorService:
             connection.execute(schema.monitor_captures.update().where(schema.monitor_captures.c.id == capture['id']).values(source_id=source['id']))
             self._publish(connection, source, 'baseline:'+revision_id, capture, revision, saved_fields,
                           {field['id']: extract_field(parsed, field, capture['url']) for field in saved_fields}, None, 'rule_revision' if old else 'baseline')
+            if automation_draft:
+                remap={('draft:'+draft['id'],original['id']):{'monitor_id':monitor_id,'field_id':saved['id'],'source_id':source['id']} for original,saved in zip(enabled,saved_fields)}
+                automation_service._activate(connection,automation_draft,remap=remap)
         run = self.service.enqueue(source['id'])
         return {'monitor': self.monitor(monitor_id), 'source': self.service.source(source['id']), 'run': run}
 
@@ -311,6 +347,8 @@ class MonitorService:
             connection.execute(schema.monitors.update().where(schema.monitors.c.id == monitor_id).values(paused=bool(paused), updated_at=time.time()))
             active_count = connection.execute(select(func.count()).select_from(schema.monitors).where(schema.monitors.c.source_id == monitor['source_id'], schema.monitors.c.paused.is_(False))).scalar()
             connection.execute(sources.update().where(sources.c.id == monitor['source_id']).values(paused=not bool(active_count)))
+            from .automation import enqueue_affected
+            enqueue_affected(connection,monitor['source_id'],'monitor-state:'+str(time.time_ns()))
         if not paused:
             self.service.enqueue(monitor['source_id'])
         return self.monitor(monitor_id)
@@ -438,6 +476,8 @@ class MonitorService:
             counts['changed'] += int(changed)
         if counts['observations']:
             connection.execute(schema.monitor_events.insert().values(source_id=source['id'], monitor_id=monitor_id, kind='monitor_updated', at=at, detail={'revision_id': revision_id, **counts}))
+            from .automation import enqueue_affected
+            enqueue_affected(connection,source['id'],fingerprint([run_id,revision_id,capture['url']]))
         return counts
 
     def dashboard(self, source_id=None, include_demo=False, limit=50, cursor=None, monitor_ids=None):
@@ -582,7 +622,7 @@ class MonitorService:
                 raise ValueError('Dashboard preferences support order, hidden and pinned field lists.')
             for key in ('order', 'hidden', 'pinned'):
                 items = value.get(key, [])
-                if not isinstance(items, list) or len(items) > 2000 or any(not isinstance(item, str) or len(item) > 64 for item in items):
+                if not isinstance(items, list) or len(items) > 2000 or any(not isinstance(item, str) or len(item) > 256 for item in items):
                     raise ValueError('Invalid dashboard field preferences.')
             value = {key: list(dict.fromkeys(value.get(key, []))) for key in ('order', 'hidden', 'pinned')}
             with self.db.tx() as connection:

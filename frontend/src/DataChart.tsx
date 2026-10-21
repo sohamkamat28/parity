@@ -3,8 +3,8 @@ import type {Shared} from './App';
 import type {MonitorField,Observation} from './types';
 import {api,date} from './api';
 
-type Point=Observation&{number:number|null;revision_id:string;break_before:boolean};
-export type Series={monitor_id:string;field_id:string;points:Point[];total:number;sampled:boolean};
+export type Point=Observation&{evaluation_id?:string;number:number|null;revision_id:string;break_before:boolean};
+export type Series={automation_id?:string;monitor_id:string;field_id:string;points:Point[];total:number;sampled:boolean};
 const key=(m:string,f:string)=>`${m}:${f}`;
 export function useDashboardSeries(fields:MonitorField[],days:number,revision:number){
  const [series,setSeries]=useState<Record<string,Series>>({}),[error,setError]=useState('');
@@ -31,11 +31,11 @@ export function useDashboardSeries(fields:MonitorField[],days:number,revision:nu
  },[identities,days,revision]);
  return {series,error};
 }
-export function DataChart({field,series,openCapture,compact=false}:{field:MonitorField;series?:Series;openCapture:Shared['openCapture'];compact?:boolean}){
+export function DataChart({field,series,openCapture,openCalculation,compact=false}:{field:MonitorField;series?:Series;openCapture:Shared['openCapture'];openCalculation?:(id:string)=>void;compact?:boolean}){
  const [active,setActive]=useState<Point|null>(null),[width,setWidth]=useState(510);const chart=useRef<HTMLDivElement>(null);
  useEffect(()=>{if(!chart.current)return;const observer=new ResizeObserver(entries=>setWidth(Math.max(280,Math.round(entries[0].contentRect.width))));observer.observe(chart.current);return()=>observer.disconnect();},[series?.points.length]);
  const points=series?.points??[],valid=points.filter(p=>p.number!==null);
- const show=(p:Point)=>p.capture_id&&openCapture(p.capture_id,{...field,value:p.value,unit:p.unit,period:p.period});
+ const show=(p:Point)=>{if(p.evaluation_id&&openCalculation)openCalculation(p.evaluation_id);else if(p.capture_id)openCapture(p.capture_id,{...field,value:p.value,unit:p.unit,period:p.period});};
  if(!series)return <div className={`chart-empty ${compact?'compact-chart-empty':''}`} role="status">Loading observations…</div>;
  if(!valid.length)return <div className={`chart-empty ${compact?'compact-chart-empty':''}`}>No numeric observations collected in this range.</div>;
  const values=valid.map(p=>p.number!),low=Math.min(...values),high=Math.max(...values),pad=high===low?Math.max(Math.abs(high)*.05,1):(high-low)*.12;
@@ -54,5 +54,5 @@ export function DataChart({field,series,openCapture,compact=false}:{field:Monito
   </g>)}
   {!compact&&<><text x="54" y="176" className="chart-label">{new Date(start*1000).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</text><text x={width-26} y="176" textAnchor="end" className="chart-label">{end===start?'Baseline':new Date(end*1000).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</text></>}
  </svg><p className="chart-caption" aria-live="polite">{active?`${date(active.at)} · ${active.value} ${active.unit??''}${active.period?' · '+active.period:''}`:valid.length===1?(compact?'Baseline · one observation':'Baseline collected. The next successful check adds a point.'):`${series.total.toLocaleString()} observations${series.sampled?' · sampled to retain endpoints and extrema':''}${compact?'':' · select a point for evidence'}`}</p>
- {!compact&&<details className="chart-data"><summary>Observation data</summary><div className="monitor-table-scroll" tabIndex={0}><table className="monitor-table"><caption>{field.name} — plotted observations. Gaps and different periods or rule revisions are not connected.</caption><thead><tr><th scope="col">Observed</th><th scope="col">Value</th><th scope="col">Period</th><th scope="col">Evidence</th></tr></thead><tbody>{points.map(p=><tr key={p.id}><th scope="row">{date(p.at)}</th><td>{p.number===null?p.error||p.status:`${p.value} ${p.unit??''}`}</td><td>{p.period||'—'}</td><td><button className="text-button" disabled={!p.capture_id} onClick={()=>show(p)}>Open capture</button></td></tr>)}</tbody></table></div></details>}</div>;
+ {!compact&&<details className="chart-data"><summary>Observation data</summary><div className="monitor-table-scroll" tabIndex={0}><table className="monitor-table"><caption>{field.name} — plotted observations. Gaps and different periods or rule revisions are not connected.</caption><thead><tr><th scope="col">Observed</th><th scope="col">Value</th><th scope="col">Period</th><th scope="col">Evidence</th></tr></thead><tbody>{points.map(p=><tr key={p.id}><th scope="row">{date(p.at)}</th><td>{p.number===null?p.error||p.status:`${p.value} ${p.unit??''}`}</td><td>{p.period||'—'}</td><td><button className="text-button" disabled={!p.capture_id&&!p.evaluation_id} onClick={()=>show(p)}>{p.evaluation_id?'Open calculation':'Open capture'}</button></td></tr>)}</tbody></table></div></details>}</div>;
 }

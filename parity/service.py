@@ -595,6 +595,8 @@ class Service:
                 c.execute(runs.update().where(runs.c.source_id==source_id,runs.c.status.in_(["queued","running"])).values(
                     status="cancelled",error="Source disabled",finished_at=time.time()))
             c.execute(sources.update().where(sources.c.id==source_id).values(**values))
+            from .automation import enqueue_affected
+            enqueue_affected(c,source_id,'source-state:'+uid())
         return self.source(source_id)
 
     def remove_source(self,source_id,restore=False):
@@ -617,4 +619,6 @@ class Service:
                     status='cancelled',owner=None,generation=url_jobs.c.generation+1,lease_until=0,
                     finished_at=now,error='Source removed; history retained'))
             c.execute(monitor_events.insert().values(source_id=source_id,kind='source_restored' if restore else 'source_removed',at=now,detail={}))
+            from .automation import enqueue_affected
+            enqueue_affected(c,source_id,'source-lifecycle:'+uid())
         return self.source(source_id)

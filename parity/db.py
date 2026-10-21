@@ -80,9 +80,10 @@ _legacy_session_records = Table("demo_sessions", meta,
     Column("browser_source_id", ForeignKey("sources.id")), Column("portal_url", Text, nullable=False),
     Column("created_at", Float, nullable=False, default=time.time))
 
-from . import monitor_schema, job_schema, search_schema
+from . import monitor_schema, job_schema, search_schema, automation_schema
 _V3_TABLES = tuple(monitor_schema.register(meta).values()) + tuple(job_schema.register(meta).values()) + tuple(search_schema.register(meta).values())
-SCHEMA_VERSION = 4
+_V5_TABLES = tuple(automation_schema.register(meta).values())
+SCHEMA_VERSION = 5
 _V2_TABLES = (chat_conversations, chat_messages, _legacy_session_records)
 
 
@@ -100,7 +101,7 @@ def migrate(connection,upgrade=False):
     if version and version<SCHEMA_VERSION and not upgrade:
         raise RuntimeError('Database upgrade required. Stop Parity, then run python scripts/database.py --upgrade to create a verified backup and apply the additive migration.')
     if version < 1:
-        meta.create_all(connection, tables=[t for t in meta.sorted_tables if t not in (*_V2_TABLES,*_V3_TABLES)])
+        meta.create_all(connection, tables=[t for t in meta.sorted_tables if t not in (*_V2_TABLES,*_V3_TABLES,*_V5_TABLES)])
         connection.execute(schema.insert().values(number=1))
         version = 1
     if version == 1:
@@ -129,6 +130,12 @@ def migrate(connection,upgrade=False):
         connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_monitor_series ON monitor_observations (monitor_id, field_id, at, id)')
         connection.execute(schema.delete())
         connection.execute(schema.insert().values(number=4))
+        version = 4
+    if version == 4:
+        meta.create_all(connection, tables=list(_V5_TABLES))
+        connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_automation_series ON automation_evaluations (automation_id, at, id)')
+        connection.execute(schema.delete())
+        connection.execute(schema.insert().values(number=5))
 
 def backfill_list_items(connection):
     from sqlalchemy import select,func

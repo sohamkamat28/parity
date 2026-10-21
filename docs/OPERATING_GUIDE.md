@@ -155,3 +155,7 @@ For a desktop MCP client, prefer the authenticated API bridge so it shares the r
 `GET /api/dashboard/series` accepts repeated `fields` query parameters, each a JSON object containing `monitor_id` and `field_id`, plus optional Unix `start`/`end` timestamps. The authenticated POST form accepts the same fields in a JSON body. Requests cover 1–50 numeric fields and at most 30 days; each result contains at most 200 actual points with units, periods, rule revisions, evidence IDs, gap markers and sampling metadata. The UI batches visible fields and refreshes affected series on committed events.
 
 `DELETE /api/sources/{id}` removes reversibly; `POST /api/sources/{id}/restore` restores paused. Both are idempotent and require the normal local session/token. `GET /api/list/sources?removed=true` lists retained removed sources with the existing `items`, `next_cursor`, `total` pagination shape. History/capture/version contracts are unchanged.
+
+## Calculations and alerts
+
+See [the automation guide](AUTOMATIONS.md) for automatic instruction setup, cross-source formulas, unit denominators, visual editing, freshness rules, alerts, private webhook connections, APIs and CLI commands. Schema 5 requires the same explicit backup-first upgrade described above. The launcher now supervises separate automation and notification workers; both run without models. Restores disable pending outbound deliveries.

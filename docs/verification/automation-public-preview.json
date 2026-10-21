@@ -1,0 +1,70 @@
+{
+  "url": "https://ibjarates.com/",
+  "optional_live_network": true,
+  "at": 1792555813.9774988,
+  "profile": "postgresql",
+  "models": "stopped",
+  "test_choices": {
+    "session": "PM",
+    "gold_rate_unit": "INR/10g",
+    "silver_rate_unit": "INR/kg",
+    "budget": "500000 INR"
+  },
+  "external_notifications": false,
+  "initial_calculation_status": "needs_input",
+  "status": "passed",
+  "page_fetch_calls": 1,
+  "inputs": [
+    {
+      "name": "Gold 916 \u2014 latest dated row PM",
+      "value": "133685",
+      "unit": "INR/10g",
+      "period": "2026-10-19 PM"
+    },
+    {
+      "name": "Gold 750 \u2014 latest dated row PM",
+      "value": "109458",
+      "unit": "INR/10g",
+      "period": "2026-10-19 PM"
+    },
+    {
+      "name": "Silver 999 \u2014 latest dated row PM",
+      "value": "208750",
+      "unit": "INR/kg",
+      "period": "2026-10-19 PM"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "916 Gold cost",
+      "value": "267370",
+      "unit": "INR"
+    },
+    {
+      "name": "750 Gold cost",
+      "value": "109458",
+      "unit": "INR"
+    },
+    {
+      "name": "Silver cost",
+      "value": "104375",
+      "unit": "INR"
+    },
+    {
+      "name": "Estimated material cost",
+      "value": "481203",
+      "unit": "INR"
+    },
+    {
+      "name": "Budget remaining",
+      "value": "18797",
+      "unit": "INR"
+    }
+  ],
+  "questions_resolved": [
+    "publication session",
+    "price denominators"
+  ],
+  "capture_reused_for_discovery_validation_calculation": true,
+  "personal_installation_modified": false
+}

@@ -12,8 +12,35 @@ def main():
     a=sub.add_parser("diff");a.add_argument("page_id");a.add_argument("v1",type=int);a.add_argument("v2",type=int)
     a=sub.add_parser("page");a.add_argument("page_id");a.add_argument("--version",type=int)
     sub.add_parser("status");sub.add_parser("worker")
+    a=sub.add_parser('automations');a.add_argument('--source')
+    a=sub.add_parser('automation-preview');a.add_argument('instructions');a.add_argument('--answers',help='JSON file with clarification answers');a.add_argument('--plan',help='JSON file containing a visual calculation plan')
+    a=sub.add_parser('automation-start');a.add_argument('draft_id')
+    a=sub.add_parser('automation-history');a.add_argument('automation_id')
+    a=sub.add_parser('automation-pause');a.add_argument('automation_id');a.add_argument('--resume',action='store_true')
+    a=sub.add_parser('automation-archive');a.add_argument('automation_id')
+    a=sub.add_parser('automation-parameters');a.add_argument('automation_id');a.add_argument('json_file')
+    sub.add_parser('automation-alerts')
     args=p.parse_args();s=Service()
-    if args.command=="add-source":
+    if args.command.startswith('automation'):
+        from parity.automation import Automations
+        automation=Automations(s)
+        if args.command=='automations':out=automation.listing(args.source)
+        elif args.command=='automation-preview':
+            payload={'instructions':args.instructions}
+            for option in ('answers','plan'):
+                filename=getattr(args,option)
+                if filename:
+                    with open(filename,encoding='utf-8') as f:payload[option]=json.load(f)
+            out=automation.preview(payload)
+        elif args.command=='automation-start':out=automation.activate({'draft_id':args.draft_id})
+        elif args.command=='automation-history':out=automation.history(args.automation_id)
+        elif args.command=='automation-pause':out=automation.patch(args.automation_id,{'paused':not args.resume})
+        elif args.command=='automation-archive':out=automation.archive(args.automation_id)
+        elif args.command=='automation-parameters':
+            with open(args.json_file,encoding='utf-8') as f:parameters=json.load(f)
+            out=automation.patch(args.automation_id,{'parameters':parameters})
+        else:out=automation.alerts()
+    elif args.command=="add-source":
         settings=json.loads(open(args.config,encoding="utf-8").read()) if args.config else None
         out=s.add_source(args.name,args.url,settings)
     elif args.command=="crawl":out=s.run(s.enqueue(args.source_id)["id"])

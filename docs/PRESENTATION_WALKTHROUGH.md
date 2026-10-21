@@ -55,3 +55,16 @@ Conclude the demonstration by showing remaining untested Windows deployment chec
 ## Remove and restore
 
 From Sources, remove a disposable source using the confirmation. Show that it disappears from the dashboard and current retrieval. Open Show → Removed sources; inspect retained documents/history and restore it. Explain that monitoring remains paused until explicitly resumed. The automated browser rehearsal performs this with isolated synthetic data.
+
+## Calculations that answer a practical question
+
+Use two supplier sources or a dated metal-rate page with actual accessible values. Supply your own required quantities and budget, so the demonstration answers a question the source page does not answer for that order. State whether prices are per gram, ten grams, kilogram or item. Publication sessions and dates must agree. Do not describe AM/PM rates as continuously updating ticks.
+
+1. Enter instructions including quantities and the budget; show any field/unit clarification. Activate the validated plan.
+2. Show total cost, budget utilization, remaining amount and collected trend points.
+3. Open **How this was calculated** and trace quantities, formula revision and exact source captures.
+4. Change a supplied quantity in the visual editor. Show the new result and retained earlier formula evidence.
+5. Show a real threshold alert and acknowledgement. Use controlled fixtures for predictable failure/recovery; identify them as fixtures.
+6. Ask Parity about the calculated result and inspect its calculation citation.
+
+Calculations and scheduled checks continue with local models stopped. Webhooks require a destination you configured; no public recipient is needed for the classroom demonstration. Never present simulated price changes as live publisher updates.

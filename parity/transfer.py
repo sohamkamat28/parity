@@ -241,6 +241,11 @@ def restore_database(archive_path,target_url,target_data):
 
 
 def _reset_runtime(connection):
+    from . import automation_schema as automation
+    # Connections are deliberately outside database backups. Never replay saved
+    # outbound side effects automatically, even on the same device.
+    connection.execute(automation.automation_deliveries.update().where(automation.automation_deliveries.c.status.in_(['queued','running'])).values(status='disabled',owner=None,lease_until=0,error='Restored delivery disabled; reconfigure and explicitly enable a new action.'))
+    connection.execute(automation.automation_jobs.update().where(automation.automation_jobs.c.status=='running').values(status='queued',owner=None,lease_until=0,generation=automation.automation_jobs.c.generation+1))
     # Keep frozen configurations, progress and evidence. Only process ownership is obsolete.
     from .job_schema import url_jobs,index_jobs,origin_locks,resource_locks,worker_status,run_state
     from .db import sources,runs

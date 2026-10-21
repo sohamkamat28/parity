@@ -146,6 +146,8 @@ class ChatService:
                 question=rewritten.question
             from .monitor_evidence import retrieve
             structured=retrieve(self.service,question,source_ids,mode,as_of)
+            from .automation_evidence import retrieve as calculated_evidence
+            structured=calculated_evidence(self.service,question,source_ids,mode,as_of)+structured
             try:
                 model=self.service.model()
                 if model.model and len(model.model.tokenizer.encode(question))>256:
@@ -179,7 +181,7 @@ class ChatService:
             else:
                 supplied=[];mapping={}
                 for index,item in enumerate(evidence,1):
-                    citation={key:item.get(key) for key in ('chunk_id','page_id','version_id','number','url','title','text','locator','last_verified_at','warnings','evidence_type','capture_id','snapshot_id','monitor_id','field_id','period','unit','value','supporting_captures')}
+                    citation={key:item.get(key) for key in ('chunk_id','page_id','version_id','number','url','title','text','locator','last_verified_at','warnings','evidence_type','capture_id','snapshot_id','monitor_id','field_id','period','unit','value','supporting_captures','evaluation_id','automation_id')}
                     citation['id']=index;mapping[index]=citation
                     supplied.append({'id':index,'title':item['title'],'version':item['number'],'passage':item['text'],'locator':item['locator'],'warnings':item.get('warnings',[])})
                 if self.provider=='local':

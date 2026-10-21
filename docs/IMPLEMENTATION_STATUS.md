@@ -1,8 +1,19 @@
 # Parity 2.0 implementation status
 
-Updated 19 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
+Updated 21 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
 
-## Implemented and exercised
+## Calculation automation follow-up — 21 October 2026
+
+General cross-source calculations, a visual builder, deterministic instruction templates and validated local-model proposals are implemented. Quantities, dimensional units/price denominators, table/list aggregates, compatible history, formula revisions and immutable input evidence feed calculated dashboard values, trends, budget comparisons and ranked inputs. Missing details require clarification; unsupported instruction clauses are not silently omitted.
+
+Schema 5 adds durable evaluation and notification queues, lease/generation fencing, current-value eligibility, conditional/sustained rules, cooldowns, in-app alert acknowledgement/recovery and explicitly configured public-HTTPS webhooks. Paused/failed/removed/overdue dependencies block notifications and fresh answers. Private connections stay outside database backups; restores disable pending outbound deliveries. Source setup and calculations activate atomically. Existing REST, CLI and all five MCP contracts remain covered.
+
+The final local combined suite passed **330 tests with 4 intentional profile skips**. Production build, dependency checks, browser acceptance with models stopped and enabled, and actual free Qwen calculation citations passed. The real IBJA page passed a disposable PostgreSQL rehearsal after explicit PM-session and price-denominator choices, reusing one capture. The local schema-4-to-5 upgrade verified all 30 original data-table hashes, 1,419 capture/artifact hashes and the legacy auxiliary SQLite logical contents. See [the automation guide](AUTOMATIONS.md) and [latest verification](VERIFICATION_REPORT.md#automatic-calculations-rules-and-alerts--21-october-2026).
+
+The finite synthetic automation benchmark processed 240 evaluations for 20 automations, with measured throughput and dashboard/series query counts in [automation-benchmark.json](verification/automation-benchmark.json). It does not establish sustained deployment capacity. A fresh physical Windows Docker/native-model/GUI installation and a real external webhook receiver remain untested; deterministic delivery and Windows CI checks are separate.
+
+## Earlier implemented monitoring checkpoint
+
 
 - Automatic URL/instructions setup with optional reviewed extraction and local-model assistance, typed values, explicit periods, baseline activation and immutable rule revisions.
 - Independent capture and indexing pipelines, durable discovery/retries/leases, ownership fencing, real process interruption/recovery, idempotent publication and shared Chromium limits including previews.

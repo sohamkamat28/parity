@@ -1,0 +1,15 @@
+{
+  "at": 1792555997.3929899,
+  "profile": "postgresql",
+  "from_schema": 4,
+  "to_schema": 5,
+  "verified_backup": "parity-before-upgrade-20261021-094138.zip",
+  "original_tables_verified_by_counts_and_hashes": 30,
+  "captures_and_artifacts_verified_by_hash": 1419,
+  "legacy_auxiliary_sqlite_verified_by_logical_dump": true,
+  "legacy_note": "SQLite backup copies can have different file headers; preserved records were compared logically.",
+  "existing_sources": 6,
+  "existing_monitor_observations": 3282,
+  "result": "passed",
+  "services_were_stopped": true
+}

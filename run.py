@@ -241,7 +241,7 @@ def main(argv=None):
             owned.start("local-chat", local_command, root, env)
         if not args.without_models:
             owned.start('embedding',[sys.executable,'-m','uvicorn','parity.embedding_server:app','--host','127.0.0.1','--port',str(config.EMBEDDING_PORT),'--no-access-log'],root,env)
-        for role,name in [('scheduler','scheduler-worker'),('capture','capture-1-worker'),('capture','capture-2-worker'),('index','index-worker')]:
+        for role,name in [('scheduler','scheduler-worker'),('capture','capture-1-worker'),('capture','capture-2-worker'),('index','index-worker'),('automation','automation-worker'),('notification','notification-worker')]:
             owned.start(name,[sys.executable,'-m','parity.worker','--role',role],root,env)
         for name, app, port in [("parity", "parity.api:app", config.API_PORT)]:
             owned.start(name, [sys.executable, "-m", "uvicorn", app, "--host", "127.0.0.1",

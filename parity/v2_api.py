@@ -11,7 +11,7 @@ def service_status(service):
     now=time.time()
     workers=service.db.all(select(worker_status).where(worker_status.c.heartbeat_at>now-30))
     result={}
-    for key,roles in [('monitoring',('capture','scheduler')),('indexing',('index',))]:
+    for key,roles in [('monitoring',('capture','scheduler')),('indexing',('index',)),('automation',('automation',)),('notifications',('notification',))]:
         relevant=[w for w in workers if w['role'] in roles]
         ready=all(any(w['role']==r and w['status'] in ('ready','working') for w in relevant) for r in roles)
         result[key]={'status':'ready' if ready else ('degraded' if relevant else 'stopped'),'workers':relevant,
@@ -57,6 +57,8 @@ def event_batch(db, cursor):
 def create_router(service,chat):
     from .monitoring import MonitorService
     monitor=MonitorService(service);router=APIRouter()
+    from .automation_api import create_automation_router
+    router.include_router(create_automation_router(service))
 
     @router.get('/api/list/{kind}')
     def listing(kind:str,source_id:str|None=None,cursor:str|None=None,limit:int=Query(50,ge=1,le=200),include_demo:bool=False,status:str|None=None,q:str|None=None,kind_filter:str|None=Query(None,alias='kind'),removed:bool=False):
@@ -96,7 +98,7 @@ def create_router(service,chat):
         return result
 
     @router.post('/api/monitors/preview')
-    def preview(body:dict):return monitor.preview(body)
+    def preview(body:dict):return monitor.automation_preview(monitor.preview(body),body)
     @router.post('/api/monitors/auto-preview')
     def auto_preview(body:dict):return monitor.auto_preview(body)
     @router.post('/api/monitors')

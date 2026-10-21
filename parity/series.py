@@ -10,6 +10,13 @@ def dashboard_series(service, payload):
     fields=payload.get('fields')
     if not isinstance(fields,list) or not 1<=len(fields)<=50:
         raise ValueError('Request between 1 and 50 fields.')
+    calculated=[f for f in fields if isinstance(f,dict) and f.get('kind')=='calculated']
+    if calculated:
+        from .automation_series import calculated_series
+        result=calculated_series(service,{**payload,'fields':calculated})
+        extracted=[f for f in fields if f not in calculated]
+        if extracted:result['items']+=dashboard_series(service,{**payload,'fields':extracted})['items']
+        return result
     identities=[]
     for field in fields:
         if not isinstance(field,dict) or any(not isinstance(field.get(k),str) or not 1<=len(field[k])<=100 for k in ('monitor_id','field_id')):

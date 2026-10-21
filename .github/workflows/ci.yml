@@ -55,17 +55,20 @@ jobs:
           python-version: '3.14'
           cache: pip
       - run: python -m pip install -r requirements-test.txt -r requirements-postgres.txt
-      - run: python scripts/test.py tests/test_jobs.py tests/test_monitoring.py tests/test_v2_integration.py tests/test_dashboard_upgrade.py
+      - run: python scripts/test.py tests/test_jobs.py tests/test_monitoring.py tests/test_v2_integration.py tests/test_dashboard_upgrade.py tests/test_automation_expr.py tests/test_automation_runtime.py tests/test_automation_api.py tests/test_automation_evidence.py tests/test_automation_notifications.py
       - run: python -m playwright install --with-deps chromium
       - run: python scripts/browser_acceptance.py
+      - run: python scripts/automation_browser_acceptance.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: browser-acceptance
           path: |
             docs/verification/browser-no-models.json
+            docs/verification/automation-browser.json
             outputs/runtime/browser-*/desktop.png
             outputs/runtime/browser-*/narrow.png
+            outputs/runtime/automation-browser-*/*.png
   frontend:
     runs-on: ubuntu-latest
     steps:

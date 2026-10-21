@@ -9,7 +9,7 @@ from .jobs import Jobs
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description='Parity background service')
-    parser.add_argument('--role',choices=['scheduler','capture','index'],required=True)
+    parser.add_argument('--role',choices=['scheduler','capture','index','automation','notification'],required=True)
     parser.add_argument('--once',action='store_true')
     args=parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
@@ -17,7 +17,16 @@ def main(argv=None):
     for sig in (signal.SIGINT,signal.SIGTERM):signal.signal(sig,lambda *_:stopped.set())
     jobs=Jobs(Service(inline_index=False))
     jobs.status(args.role,'starting')
-    action={'scheduler':jobs.scheduler_once,'capture':jobs.capture_once,'index':jobs.index_once}[args.role]
+    if args.role=='automation':
+        from .automation import Automations
+        automation=Automations(jobs.service)
+        def action():
+            automation.scheduler_once()
+            return automation.once()
+    elif args.role=='notification':
+        from .automation_notifications import Notifications
+        action=Notifications(jobs.service).once
+    else:action={'scheduler':jobs.scheduler_once,'capture':jobs.capture_once,'index':jobs.index_once}[args.role]
     while not stopped.is_set():
         try:
             action()

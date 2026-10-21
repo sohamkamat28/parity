@@ -2,7 +2,9 @@
 
 Website monitoring, immutable evidence, version history and free local AI chat. Track fields on public HTML/JavaScript pages, choose a check frequency, and see each website’s tracked fields, collected values and trend graphs together without asking chat. PDF extraction, document search, REST, CLI and all five MCP tools remain available.
 
-**Development candidate, 19 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks.
+**Development candidate, 21 October 2026.** See the [verification report](docs/VERIFICATION_REPORT.md) for actual results and remaining Windows deployment checks.
+
+Describe quantities, formulas, budgets and alert conditions to create validated calculations from one or several monitored sources. Inspect their formulas, immutable inputs and collected trends; optional webhooks deliver explicitly configured notifications. See [calculations and automations](docs/AUTOMATIONS.md).
 
 ## Fresh Windows installation
 
@@ -29,7 +31,7 @@ SQLite is an explicit compatibility profile: `setup.bat -Profile sqlite`, then `
 
 ## Upgrading an existing installation
 
-Stop Parity first. Schema 4 adds reversible source removal and announcement first-observed metadata; it retains existing histories. Older databases require an explicit upgrade. Using the project Python environment, run `python scripts/database.py --upgrade` (add `--profile sqlite` for that compatibility profile). This creates and verifies a backup before applying the additive migration. Keep the backup. Fresh empty databases initialize normally.
+Stop Parity first. Schema 5 adds calculations, immutable formula revisions, alerts and durable evaluation/delivery queues; it retains existing histories and the schema-4 source-removal behavior. Older databases require an explicit upgrade. Using the project Python environment, run `python scripts/database.py --upgrade` (add `--profile sqlite` for that compatibility profile). This creates and verifies a backup before applying the additive migration. Keep the backup. Fresh empty databases initialize normally.
 
 ## macOS development
 
