@@ -1,5 +1,18 @@
 # Parity 2.0 verification report
 
+## Application theme refresh — 21 October 2026
+
+- Production TypeScript/Vite build: passed, with bundled fonts and no added dependency.
+- PostgreSQL monitoring browser rehearsal with models stopped: passed; [machine-readable results](verification/browser-no-models.json).
+- PostgreSQL automation browser rehearsal with models stopped: passed; [machine-readable results](verification/automation-browser.json).
+- Visual review: light theme across Dashboard, Sources, Changes & History, Ask Parity, source setup and calculation dialogs. Flat dashboard name/value rows replace the card grid. Existing histories, sources and calculations were preserved.
+- The browser rehearsals use isolated disposable PostgreSQL databases, exercise keyboard/narrow/reduced-motion behavior, preserve open evidence during updates, and report zero chart-series requests and browser JavaScript errors.
+- This presentation-only change does not migrate data or modify Python behavior. Earlier backend and platform results below remain dated evidence; a fresh physical Windows GUI/model/Docker installation was not repeated for this theme change.
+
+See [frontend design](FRONTEND_DESIGN.md) for tokens and the layout contract.
+The [theme review record](verification/frontend-theme.json) records the four-screen narrow review and measured foundation text contrast ratios.
+
+
 Latest calculation follow-up verified on 21 October 2026; see the final section. Earlier sections below record the 18–19 October monitoring checkpoints from the development branch. Upstream was fetched again and remained at `a344436cd8e7a292a080f3ba3a2b38da6e6eba00`. This report concerns v2; historical v1 reports are not acceptance evidence.
 
 ## Result

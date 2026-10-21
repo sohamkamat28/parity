@@ -2,7 +2,13 @@
 
 Updated 21 October 2026. This is a tested development candidate, with remaining platform/measurement limits recorded explicitly.
 
-## Dashboard wireframe implementation — 21 October 2026
+## Application theme refresh — 21 October 2026
+
+The application now uses an Agno-inspired light visual language: white surfaces, charcoal text, coral actions, consistent typography and restrained dividers. The dashboard uses flat source-grouped field and calculation ledgers instead of individual cards. Sources, changes/history, chat, setup, calculation, notification and evidence dialogs share the same tokens. Existing source schedules, identifiers, observations and formulas are unchanged; no schema migration or new frontend dependency is required.
+
+The production build and both PostgreSQL browser acceptance rehearsals pass, including automatic setup, schedule persistence, zero/table/list values, SSE/polling, failure recovery, source removal/restoration, calculated evidence, alerts and narrow keyboard layouts. All four screens and the setup/evidence dialogs were reviewed visually. See [the frontend design guide](FRONTEND_DESIGN.md). The earlier tile layout below is superseded.
+
+## Earlier dashboard wireframe implementation — 21 October 2026
 
 The latest dashboard follows the supplied sketch: full-width server-backed search, source name/link and icon refresh, a three-column field tile grid alongside two-column calculations at desktop width, and two-column/stacked grids on narrow screens. Source schedules/management, field history/evidence and calculation controls are accessed by clicking the relevant name or tile. Healthy-state badges, repeated metadata, totals and the old source dropdown no longer crowd the overview. Actionable notifications remain visible; retained alerts/deliveries open separately. Search runs against metadata before bounded pagination and accepts literal queries up to 200 characters. No schema migration, model calls or changed extraction rules are required. The combined suite passed **332 tests with 4 intentional skips**, and both updated PostgreSQL browser acceptance flows passed with models stopped.
 

@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-21",
+  "reference": "https://www.agno.com/",
+  "implementation": "Shared light theme, coral actions and flat source ledgers",
+  "production_build": "passed",
+  "npm_audit": "0 vulnerabilities",
+  "monitoring_fixture": "browser-no-models.json",
+  "automation_fixture": "automation-browser.json",
+  "manual_screens": [
+    "Dashboard",
+    "Sources",
+    "Changes & History",
+    "Ask Parity"
+  ],
+  "manual_dialogs": [
+    "Source setup",
+    "Calculation setup"
+  ],
+  "narrow_review": {
+    "requested_width": 390,
+    "observed_css_viewport": 433,
+    "document_width": 426,
+    "overflow": false,
+    "note": "Existing browser zoom affects CUA viewport dimensions; isolated acceptance uses exact 390 CSS pixels."
+  },
+  "foundation_text_contrast": [
+    {
+      "role": "Body",
+      "foreground": "#242426",
+      "background": "#fafaf9",
+      "ratio": 14.84
+    },
+    {
+      "role": "Secondary text",
+      "foreground": "#6d6d73",
+      "background": "#fafaf9",
+      "ratio": 4.92
+    },
+    {
+      "role": "Primary action",
+      "foreground": "#ffffff",
+      "background": "#cf452b",
+      "ratio": 4.63
+    },
+    {
+      "role": "Active navigation",
+      "foreground": "#b43720",
+      "background": "#fcf0eb",
+      "ratio": 5.36
+    },
+    {
+      "role": "Verified status",
+      "foreground": "#25664a",
+      "background": "#edf6f0",
+      "ratio": 6.19
+    },
+    {
+      "role": "Warning status",
+      "foreground": "#946009",
+      "background": "#fff7e8",
+      "ratio": 5.01
+    },
+    {
+      "role": "Failed status",
+      "foreground": "#b22d3e",
+      "background": "#fff0f1",
+      "ratio": 5.69
+    }
+  ],
+  "limits": [
+    "Foundation token contrast is not a claim that every possible dynamic content combination has been audited.",
+    "No physical Windows GUI installation or new backend benchmark was performed for this CSS refresh."
+  ]
+}
